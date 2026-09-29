@@ -4,7 +4,7 @@ import { ref } from 'vue';
 
 const RELEASE_API_URL = 'https://api.github.com/repos/zyx3721/picsw-rust/releases/latest';
 const RELEASE_PAGE_URL = 'https://github.com/zyx3721/picsw-rust/releases/latest';
-const AUTO_CHECK_DELAY_MS = 4000;
+const AUTO_CHECK_DELAY_MS = 1000;
 const CHECK_TIMEOUT_MS = 15000;
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading';
