@@ -242,7 +242,7 @@ picsw-rust/
 │   │   ├── db.rs             SQLite connection & schema
 │   │   ├── models.rs         Data models
 │   │   ├── types_def.rs      Image-host metadata
-│   ├── icons/                App icons (source image: app-icon.png)
+│   ├── icons/                App icons and installer images (source image: app-icon.png)
 │   ├── tauri.conf.json       Tauri bundling & window configuration
 │   └── Cargo.toml
 ├── src/                      Vue 3 frontend

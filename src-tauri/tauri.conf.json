@@ -39,6 +39,10 @@
     "windows": {
       "webviewInstallMode": {
         "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "headerImage": "icons/nsis-header.bmp"
       }
     }
   }

@@ -240,7 +240,7 @@ picsw-rust/
 │   │   ├── db.rs             SQLite 连接与建表
 │   │   ├── models.rs         数据模型
 │   │   ├── types_def.rs      图床类型元数据
-│   ├── icons/                应用图标（源图 app-icon.png）
+│   ├── icons/                应用图标与安装器图像（源图 app-icon.png）
 │   ├── tauri.conf.json       Tauri 打包与窗口配置
 │   └── Cargo.toml
 ├── src/                      Vue 3 前端
