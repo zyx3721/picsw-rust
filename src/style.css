@@ -1118,6 +1118,20 @@ svg {
   font-size: 13px;
   flex-shrink: 0;
 }
+.about-update-area {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.about-update-tag {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
 .about-row {
   display: flex;
   align-items: center;

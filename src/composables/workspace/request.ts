@@ -75,6 +75,12 @@ export function createWorkspaceRequest() {
           return await invoke<T>('create_convert_task', { req: body });
         case 'POST /api/download/images':
           return await invoke<T>('download_remote_images', { urls: body.urls || [], targetDir: body.target_dir || '' });
+        case 'GET /api/app/update-runtime':
+          return await invoke<T>('get_update_runtime');
+        case 'POST /api/app/update/download':
+          return await invoke<T>('download_update', { url: body.url || '', sha256: body.sha256 || '' });
+        case 'POST /api/app/update/apply':
+          return await invoke<T>('apply_update', { filePath: body.file_path || '' });
         default:
           break;
       }

@@ -8,6 +8,7 @@ import { useWorkspaceLocalUpload } from './workspace/localUploadWorkspace';
 import { useWorkspaceNotices } from './workspace/notices';
 import { createWorkspaceRequest } from './workspace/request';
 import { useTaskProgress } from './workspace/taskProgress';
+import { createUpdateChecker } from './workspace/updateChecker';
 import { useWorkspaceData } from './workspace/workspaceData';
 import type { ConversionRecord, PicbedConfig, WorkspaceTab } from './workspace/types';
 
@@ -270,6 +271,12 @@ export function usePicbedWorkspace() {
     reloadConfigs: () => loadConfigs(),
   });
 
+  const { updateStatus, updateVersion, checkUpdate, startUpdate } = createUpdateChecker({
+    request,
+    showMessage,
+    showError,
+  });
+
   function clearWorkspaceDrafts() {
     resetConfigForm();
     resetConvertForm();
@@ -435,6 +442,10 @@ export function usePicbedWorkspace() {
     toggleSyncHistory,
     selectRevision,
     restoreRevision,
+    updateStatus,
+    updateVersion,
+    checkUpdate,
+    startUpdate,
     secretVisibility,
     isAuthed,
     supportedTypes,
