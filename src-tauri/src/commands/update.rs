@@ -29,16 +29,42 @@ pub fn get_update_runtime() -> UpdateRuntime {
     }
 }
 
-/// 流式下载更新包到临时目录，SHA-256 校验通过后返回落盘路径
+/// 从校验和清单文本中提取目标文件的 SHA-256
+fn extract_checksum(content: &str, asset_name: &str) -> Result<String, String> {
+    for line in content.lines() {
+        let mut parts = line.trim().split_whitespace();
+        let Some(hash) = parts.next() else { continue };
+        let Some(name) = parts.next() else { continue };
+        if name == asset_name && hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Ok(hash.to_ascii_lowercase());
+        }
+    }
+    Err("校验信息中未找到更新包，已取消更新".to_string())
+}
+
+/// 流式下载更新包到临时目录，经发布页校验和清单比对 SHA-256 后返回落盘路径
 #[tauri::command]
-pub async fn download_update(url: String, sha256: String) -> Result<String, String> {
-    let name = url.rsplit('/').next().unwrap_or("").trim();
-    if name.is_empty() || name.contains('\\') || name.contains("..") || !name.contains('.') {
+pub async fn download_update(url: String, checksum_url: String, asset_name: String) -> Result<String, String> {
+    if asset_name.is_empty()
+        || asset_name.contains('\\')
+        || asset_name.contains('/')
+        || asset_name.contains("..")
+        || !url.rsplit('/').next().is_some_and(|tail| tail == asset_name)
+    {
         return Err("更新包地址不正确".to_string());
     }
+    let checksum = reqwest::get(&checksum_url)
+        .await
+        .map_err(|e| format!("获取校验信息失败: {e}"))?
+        .error_for_status()
+        .map_err(|e| format!("获取校验信息失败: {e}"))?
+        .text()
+        .await
+        .map_err(|e| format!("读取校验信息失败: {e}"))?;
+    let expected = extract_checksum(&checksum, &asset_name)?;
     let dir = std::env::temp_dir().join("picbed-switcher-update");
     std::fs::create_dir_all(&dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
-    let dest = dir.join(name);
+    let dest = dir.join(&asset_name);
     let response = reqwest::get(&url)
         .await
         .map_err(|e| format!("连接下载源失败: {e}"))?;
@@ -68,7 +94,7 @@ pub async fn download_update(url: String, sha256: String) -> Result<String, Stri
         }
     }
     let actual = format!("{:x}", hasher.finalize());
-    if !actual.eq_ignore_ascii_case(sha256.trim()) {
+    if actual != expected {
         let _ = std::fs::remove_file(&dest);
         return Err("更新包完整性校验失败，已取消更新".to_string());
     }

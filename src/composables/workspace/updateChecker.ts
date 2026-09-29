@@ -14,7 +14,6 @@ type ReleaseAsset = { name: string; browser_download_url: string };
 type ReleaseInfo = { tag_name?: string; assets?: ReleaseAsset[] };
 
 type UpdateTask = {
-  version: string;
   assetName: string;
   assetUrl: string;
   checksumUrl: string;
@@ -44,11 +43,10 @@ function pickUpdateAsset(assets: ReleaseAsset[], version: string, runtime: Updat
   const setupTag = runtime.arch === 'amd64' ? 'x64' : runtime.arch;
   const assetName = runtime.portable
     ? `picbed-switcher_${version}_windows_${runtime.arch}.zip`
-    : `PicBed Switcher_${version}_${setupTag}-setup.exe`;
+    : `PicBed.Switcher_${version}_${setupTag}-setup.exe`;
   const asset = assets.find(item => item.name === assetName);
   if (!asset) return null;
   return {
-    version,
     assetName,
     assetUrl: asset.browser_download_url,
     checksumUrl: `https://github.com/zyx3721/picsw-rust/releases/download/v${version}/SHA256SUMS_windows-${runtime.arch}.txt`,
@@ -73,17 +71,6 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
     } finally {
       clearTimeout(timer);
     }
-  }
-
-  async function fetchChecksum(task: UpdateTask): Promise<string> {
-    const response = await fetch(task.checksumUrl);
-    if (!response.ok) throw new Error('获取更新包校验信息失败');
-    const text = await response.text();
-    for (const line of text.split('\n')) {
-      const [hash, name] = line.trim().split(/\s+/);
-      if (name === task.assetName && /^[0-9a-f]{64}$/i.test(hash || '')) return hash;
-    }
-    throw new Error('校验信息中未找到更新包，已取消更新');
   }
 
   /// 检查 GitHub 最新版本；manual 为手动点击（结果以提示反馈），启动自动检查静默进行
@@ -128,10 +115,9 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
     }
     updateStatus.value = 'downloading';
     try {
-      const sha256 = await fetchChecksum(task);
       const filePath = await request<string>('/api/app/update/download', {
         method: 'POST',
-        body: JSON.stringify({ url: task.assetUrl, sha256 }),
+        body: JSON.stringify({ url: task.assetUrl, checksum_url: task.checksumUrl, asset_name: task.assetName }),
       });
       await request<void>('/api/app/update/apply', {
         method: 'POST',
