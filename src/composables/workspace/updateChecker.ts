@@ -93,7 +93,7 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
     try {
       const [current, runtime, release] = await Promise.all([
         getVersion(),
-        request<UpdateRuntime>('GET /api/app/update-runtime'),
+        request<UpdateRuntime>('/api/app/update-runtime'),
         fetchRelease(),
       ]);
       const latest = (release.tag_name || '').replace(/^v/, '');
@@ -129,11 +129,11 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
     updateStatus.value = 'downloading';
     try {
       const sha256 = await fetchChecksum(task);
-      const filePath = await request<string>('POST /api/app/update/download', {
+      const filePath = await request<string>('/api/app/update/download', {
         method: 'POST',
         body: JSON.stringify({ url: task.assetUrl, sha256 }),
       });
-      await request<void>('POST /api/app/update/apply', {
+      await request<void>('/api/app/update/apply', {
         method: 'POST',
         body: JSON.stringify({ file_path: filePath }),
       });
