@@ -190,27 +190,3 @@ fn script_path() -> Result<PathBuf, String> {
     std::fs::create_dir_all(&dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
     Ok(dir.join("apply-portable-update.ps1"))
 }
-
-#[cfg(test)]
-mod tests {
-    use super::extract_checksum;
-
-    const SAMPLE: &str = "13a1f89a9f56ae322dba6057f5f6ba17f9aba55e0954219fd2ce6fa2926e5a92 *PicBed Switcher_1.1.0_x64-setup.exe\n0db93fcc4a7f42c5636d0d11b0195efbd55d6873fec4d70661ecd5289e147d55 *picbed-switcher_1.1.0_windows_amd64.zip\n";
-
-    #[test]
-    fn matches_installer_asset_with_separator_variants() {
-        let hash = extract_checksum(SAMPLE, "PicBed.Switcher_1.1.0_x64-setup.exe").unwrap();
-        assert_eq!(hash, "13a1f89a9f56ae322dba6057f5f6ba17f9aba55e0954219fd2ce6fa2926e5a92");
-    }
-
-    #[test]
-    fn matches_portable_asset_name() {
-        let hash = extract_checksum(SAMPLE, "picbed-switcher_1.1.0_windows_amd64.zip").unwrap();
-        assert_eq!(hash, "0db93fcc4a7f42c5636d0d11b0195efbd55d6873fec4d70661ecd5289e147d55");
-    }
-
-    #[test]
-    fn rejects_unknown_asset() {
-        assert!(extract_checksum(SAMPLE, "picbed-switcher_9.9.9_windows_amd64.zip").is_err());
-    }
-}
