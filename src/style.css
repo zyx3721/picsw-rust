@@ -880,7 +880,7 @@ svg {
   color: var(--danger);
 }
 .sync-status-badge[data-kind='muted'] {
-  background: var(--surface-muted);
+  background: #e2e8f0;
   color: var(--muted);
 }
 .sync-status-badge.version {
