@@ -820,33 +820,6 @@ svg {
   color: var(--muted);
   font-size: 12px;
 }
-.sync-cloud-pwd-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.sync-cloud-pwd-row input {
-  flex: 1;
-  min-width: 180px;
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: #fff;
-  color: var(--text);
-  font-size: 13px;
-}
-.sync-cloud-pwd-row button {
-  min-height: 36px;
-  padding: 0 12px;
-  font-size: 12px;
-}
-.sync-cloud-pwd-error {
-  color: var(--danger);
-  font-size: 12px;
-  font-weight: 650;
-}
 .sync-banner-actions {
   display: flex;
   align-items: center;
@@ -1291,6 +1264,45 @@ svg {
   font-size: 12px;
   line-height: 1.6;
   word-break: break-all;
+}
+.confirm-dialog.cloud-pwd-dialog {
+  width: min(560px, calc(100vw - 32px));
+  display: grid;
+  gap: 12px;
+}
+.sync-dialog-head h2.blue {
+  background: rgba(37, 99, 235, 0.12);
+  color: #2563eb;
+}
+.sync-dialog-head h2.blue svg {
+  color: #2563eb;
+}
+.cloud-pwd-desc {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.cloud-pwd-input-row {
+  position: relative;
+}
+.cloud-pwd-input-row input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 44px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font-size: 13px;
+}
+.cloud-pwd-input-row input:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.18);
+  border-color: #2563eb;
+}
+.dialog-actions .primary.blue {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.24);
 }
 .connect-fallback-row {
   width: 100%;

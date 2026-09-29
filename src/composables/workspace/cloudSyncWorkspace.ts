@@ -158,6 +158,7 @@ export function useWorkspaceCloudSync({
   const passwordHintHash = ref(localStorage.getItem(PASSWORD_HINT_STORAGE_KEY) || '');
   const passwordModalOpen = ref(false);
   const passwordModalMode = ref<'set' | 'change'>('set');
+  const cloudPwdModalOpen = ref(false);
   const githubConnectOpen = ref(false);
   const githubConnectPreparing = ref(false);
   const deviceFlowUserCode = ref('');
@@ -628,6 +629,14 @@ export function useWorkspaceCloudSync({
 
   function closePasswordModal() {
     passwordModalOpen.value = false;
+  }
+
+  function openCloudPwdModal() {
+    cloudPwdModalOpen.value = true;
+  }
+
+  function closeCloudPwdModal() {
+    cloudPwdModalOpen.value = false;
   }
 
   /// 行内解锁：锁定态直接在同步密码行输入解锁，不再弹窗；
@@ -1374,6 +1383,9 @@ export function useWorkspaceCloudSync({
     passwordModalMode,
     openPasswordModal,
     closePasswordModal,
+    cloudPwdModalOpen,
+    openCloudPwdModal,
+    closeCloudPwdModal,
     submitPasswordModal,
     unlockWithPassword,
     githubConnectOpen,

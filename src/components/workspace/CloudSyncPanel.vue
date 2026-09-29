@@ -3,6 +3,7 @@ import { AlertTriangle, Cloud, Database, Download, History, KeyRound, Lock, Refr
 import AppTooltip from '../AppTooltip.vue';
 import SyncPasswordDialog from '../dialogs/SyncPasswordDialog.vue';
 import GithubConnectDialog from '../dialogs/GithubConnectDialog.vue';
+import CloudPasswordDialog from '../dialogs/CloudPasswordDialog.vue';
 import { ref, watch } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 
@@ -19,7 +20,6 @@ const {
   syncNow,
   syncBanner,
   overrideCloudWithLocal,
-  resolveConflictWithCloudPassword,
   restoreRemoteVersion,
   forcePushLocal,
   dismissSyncBanner,
@@ -27,6 +27,7 @@ const {
   passwordStatus,
   passwordModalOpen,
   openPasswordModal,
+  openCloudPwdModal,
   unlockWithPassword,
   openGithubConnect,
   githubConnectPreparing,
@@ -47,11 +48,6 @@ const {
   selectRevision,
   restoreRevision,
 } = useWorkspaceContext();
-
-const cloudPwdInput = ref('');
-const cloudPwdVisible = ref(false);
-const cloudPwdSubmitting = ref(false);
-const cloudPwdError = ref('');
 
 const unlockInput = ref('');
 const restoreConfirmArmed = ref(false);
@@ -86,22 +82,6 @@ function submitUnlock() {
   }
   unlockInput.value = '';
 }
-
-async function submitCloudPassword() {
-  cloudPwdSubmitting.value = true;
-  cloudPwdError.value = '';
-  try {
-    const error = await resolveConflictWithCloudPassword(cloudPwdInput.value);
-    if (error) {
-      cloudPwdError.value = error;
-      return;
-    }
-    cloudPwdInput.value = '';
-    cloudPwdVisible.value = false;
-  } finally {
-    cloudPwdSubmitting.value = false;
-  }
-}
 </script>
 
 <template>
@@ -124,16 +104,16 @@ async function submitCloudPassword() {
       </div>
       <div class="sync-banner-actions">
         <button
-          v-if="syncBanner.kind === 'conflict' && !cloudPwdVisible"
+          v-if="syncBanner.kind === 'conflict'"
           class="secondary"
           type="button"
           :disabled="syncBusy"
-          @click="cloudPwdVisible = true"
+          @click="openCloudPwdModal"
         >
           <Download :size="16" />使用云端（输入云端密码）
         </button>
         <button
-          v-if="syncBanner.kind === 'conflict' && !cloudPwdVisible"
+          v-if="syncBanner.kind === 'conflict'"
           class="warn"
           type="button"
           :disabled="syncBusy"
@@ -167,21 +147,6 @@ async function submitCloudPassword() {
           :disabled="syncBusy"
           @click="dismissSyncBanner"
         >取消</button>
-      </div>
-      <div v-if="syncBanner.kind === 'conflict' && cloudPwdVisible" class="sync-cloud-pwd-row">
-        <input
-          v-model="cloudPwdInput"
-          type="password"
-          placeholder="输入云端同步密码"
-          spellcheck="false"
-          autocomplete="off"
-          @keyup.enter="submitCloudPassword"
-        />
-        <button class="primary" type="button" :disabled="cloudPwdSubmitting || !cloudPwdInput" @click="submitCloudPassword">
-          {{ cloudPwdSubmitting ? '解密中…' : '使用云端恢复' }}
-        </button>
-        <button class="ghost" type="button" @click="cloudPwdVisible = false">取消</button>
-        <span v-if="cloudPwdError" class="sync-cloud-pwd-error">{{ cloudPwdError }}</span>
       </div>
     </div>
 
@@ -381,6 +346,7 @@ async function submitCloudPassword() {
     </Teleport>
 
     <SyncPasswordDialog :open="passwordModalOpen" />
+    <CloudPasswordDialog />
     <GithubConnectDialog />
   </div>
 </section>
