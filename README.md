@@ -268,6 +268,14 @@ picsw-rust/
 | [GitHub OAuth App 与 Device Flow 配置指南](docs/github-oauth-device-flow.md) | 云同步设备码授权的注册与配置 |
 | [English README](README.en.md) | 同样的内容，英文版 |
 
+## 版本历史
+
+| 版本 | 发布日期 | 更新日志 |
+| --- | --- | --- |
+| v1.0.0 | 2026-09-29 | [verchanglog/v1.0.0.md](verchanglog/v1.0.0.md) |
+
+各版本的构建产物与发布说明见 [GitHub Releases](https://github.com/zyx3721/picsw-rust/releases)。
+
 ## 致谢
 
 感谢以下开源项目和技术社区的支持：

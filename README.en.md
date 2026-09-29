@@ -270,6 +270,14 @@ picsw-rust/
 | [GitHub OAuth App & Device Flow Guide](docs/github-oauth-device-flow.md) | Device-flow setup for cloud sync |
 | [中文 README](README.md) | 同样的内容，中文版 |
 
+## Release Notes
+
+| Version | Date | Changelog |
+| --- | --- | --- |
+| v1.0.0 | 2026-09-29 | [verchanglog/v1.0.0.md](verchanglog/v1.0.0.md) |
+
+Build artifacts and release notes for each version are available on the [GitHub Releases](https://github.com/zyx3721/picsw-rust/releases) page.
+
 ## Acknowledgements
 
 Thanks to the following open-source projects and communities:
