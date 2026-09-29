@@ -322,13 +322,13 @@ export function useWorkspaceCloudSync({
 
   const syncConnected = computed(() => syncAccount.value.length > 0);
   const localConfigCount = computed(() => configs.value.length);
-  /// 同步状态徽章：同步中 / 冲突 / 阻塞 / 待恢复 / 从未同步 / 就绪
+  /// 同步状态徽章：同步中 / 冲突 / 阻塞 / 待恢复 / 就绪
   const syncStatusBadge = computed<SyncStatusBadge>(() => {
     if (syncBusy.value) return { text: '同步中', kind: 'busy' };
     if (syncBanner.value?.kind === 'conflict') return { text: '冲突', kind: 'danger' };
     if (syncBanner.value?.kind === 'blocked') return { text: '已拦截', kind: 'danger' };
     if (syncBanner.value?.kind === 'empty') return { text: '待恢复', kind: 'warn' };
-    if (!syncRemoteState.value) return { text: '从未同步', kind: 'muted' };
+    if (!syncConnected.value) return { text: '就绪', kind: 'muted' };
     return { text: '就绪', kind: 'ok' };
   });
   const remoteVersionBadge = computed(() => {
@@ -614,6 +614,7 @@ export function useWorkspaceCloudSync({
     secretBackend.value = '';
     syncAccount.value = '';
     syncRemoteState.value = null;
+    syncBanner.value = null;
     lastSyncAt.value = 0;
     lastSyncVersion.value = 0;
     localStorage.removeItem(LAST_SYNC_STORAGE_KEY);
