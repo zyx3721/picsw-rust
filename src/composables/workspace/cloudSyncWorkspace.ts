@@ -332,8 +332,9 @@ export function useWorkspaceCloudSync({
     if (!syncConnected.value) return { text: '就绪', kind: 'muted' };
     return { text: '就绪', kind: 'ok' };
   });
+  /// 云端版本徽章：显示上次成功同步的版本号，未同步过或已断开时不显示
   const remoteVersionBadge = computed(() => {
-    const version = syncRemoteState.value?.version || 0;
+    const version = lastSyncVersion.value;
     return version > 0 ? `v${version}` : '';
   });
   const lastSyncText = computed(() => {
