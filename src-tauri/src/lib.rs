@@ -42,6 +42,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_single_instance::init(|_app, _args, _cwd| {}))
         .setup(|app| {
+            commands::update::cleanup_update_temp();
             let data_dir = app
                 .path()
                 .app_data_dir()

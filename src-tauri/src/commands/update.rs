@@ -1,10 +1,25 @@
 //! 检查更新的运行时信息、下载更新包与自替换安装
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// 临时下载目录常量名（更新包、校验与替换脚本所在）
+fn temp_update_dir() -> PathBuf {
+    std::env::temp_dir().join("picbed-switcher-update")
+}
+
+/// 清理上一轮更新残留的临时下载目录（应用启动时调用，幂等）
+pub fn cleanup_update_temp() {
+    let _ = std::fs::remove_dir_all(temp_update_dir());
+}
 
 #[derive(Serialize)]
 pub struct UpdateRuntime {
@@ -67,7 +82,7 @@ pub async fn download_update(url: String, checksum_url: String, asset_name: Stri
         .await
         .map_err(|e| format!("读取校验信息失败: {e}"))?;
     let expected = extract_checksum(&checksum, &asset_name)?;
-    let dir = std::env::temp_dir().join("picbed-switcher-update");
+    let dir = temp_update_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
     let dest = dir.join(&asset_name);
     let response = reqwest::get(&url)
@@ -162,6 +177,7 @@ fn windows_apply(package: &Path) -> Result<(), String> {
         Command::new("powershell")
             .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
             .arg(&script)
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| format!("启动替换脚本失败: {e}"))?;
     }
@@ -171,12 +187,17 @@ fn windows_apply(package: &Path) -> Result<(), String> {
 #[cfg(target_os = "windows")]
 fn write_portable_script(package: &Path, dir: &Path, exe: &Path) -> Result<PathBuf, String> {
     let path = script_path()?;
+    let temp_dir = path
+        .parent()
+        .ok_or_else(|| "获取临时目录失败".to_string())?
+        .to_path_buf();
     let body = format!(
-        "Start-Sleep -Seconds 2\nExpand-Archive -Force -Path '{}' -DestinationPath '{}'\nStart-Process -FilePath '{}'\nRemove-Item -LiteralPath '{}'\n",
+        "Start-Sleep -Seconds 2\nExpand-Archive -Force -Path '{}' -DestinationPath '{}'\nRemove-Item -LiteralPath '{}\\README.txt' -ErrorAction SilentlyContinue\nStart-Process -FilePath '{}'\nRemove-Item -Recurse -Force '{}' -ErrorAction SilentlyContinue\n",
         package.display(),
         dir.display(),
+        dir.display(),
         exe.display(),
-        path.display()
+        temp_dir.display()
     );
     let mut bytes = b"\xEF\xBB\xBF".to_vec();
     bytes.extend_from_slice(body.as_bytes());
@@ -186,7 +207,7 @@ fn write_portable_script(package: &Path, dir: &Path, exe: &Path) -> Result<PathB
 
 #[cfg(target_os = "windows")]
 fn script_path() -> Result<PathBuf, String> {
-    let dir = std::env::temp_dir().join("picbed-switcher-update");
+    let dir = temp_update_dir();
     std::fs::create_dir_all(&dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
     Ok(dir.join("apply-portable-update.ps1"))
 }
