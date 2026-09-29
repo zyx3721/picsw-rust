@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { Download, Eye, EyeOff, X } from 'lucide-vue-next';
+import { Download, X } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 
 const { cloudPwdModalOpen, resolveConflictWithCloudPassword, closeCloudPwdModal } = useWorkspaceContext();
 
 const cloudPassword = ref('');
-const cloudPwdVisible = ref(false);
 const submitting = ref(false);
 const error = ref('');
 
 watch(cloudPwdModalOpen, value => {
   if (value) {
     cloudPassword.value = '';
-    cloudPwdVisible.value = false;
     error.value = '';
   }
 });
@@ -49,22 +47,13 @@ async function handleSubmit() {
       <div class="cloud-pwd-input-row">
         <input
           v-model="cloudPassword"
-          :type="cloudPwdVisible ? 'text' : 'password'"
+          type="password"
           placeholder="云端（另一台设备的）同步密码"
           spellcheck="false"
           autocomplete="off"
           autofocus
           @keyup.enter="handleSubmit"
         />
-        <button
-          class="field-action"
-          type="button"
-          :aria-label="cloudPwdVisible ? '隐藏密码' : '显示密码'"
-          @click="cloudPwdVisible = !cloudPwdVisible"
-        >
-          <EyeOff v-if="cloudPwdVisible" :size="18" />
-          <Eye v-else :size="18" />
-        </button>
       </div>
       <p v-if="error" class="sync-dialog-error">{{ error }}</p>
       <div class="dialog-actions">
