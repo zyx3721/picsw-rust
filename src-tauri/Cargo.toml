@@ -1,0 +1,52 @@
+[package]
+name = "picsw-rust"
+version = "1.0.0"
+description = "图床转站助手 - Markdown 图床地址批量转换桌面端"
+authors = ["Jerion"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["sync", "macros", "rt", "time"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "multipart"] }
+aes-gcm = "0.10"
+sha1 = "0.10"
+sha2 = "0.10"
+hmac = "0.12"
+base64 = "0.22"
+hex = "0.4"
+rand = "0.8"
+regex = "1"
+chrono = "0.4"
+infer = "0.19"
+percent-encoding = "2"
+url = "2"
+once_cell = "1"
+tauri-plugin-single-instance = "2"
+tauri-plugin-opener = "2"
+# 系统钥匙串（Windows 凭据管理器 / macOS Keychain / Linux Secret Service）
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+# 加密文件回退的机器标识（machine-id / MachineGuid / IOPlatformUUID）
+machine-uid = "0.5"
+
+[lib]
+name = "picsw_rust_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "picbed-switcher"
+path = "src/main.rs"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

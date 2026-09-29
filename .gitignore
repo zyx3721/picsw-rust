@@ -1,0 +1,28 @@
+# ===== 依赖与包管理 =====
+# Node.js 前端依赖
+node_modules/
+
+# ===== 构建产物 =====
+# 前端 Vite 构建输出
+dist/
+
+# Rust / Tauri 编译输出（含 NSIS、dmg、deb 等安装包）
+src-tauri/target/
+
+# ===== 自动生成文件 =====
+# Tauri 由 capabilities 与 schema 自动生成的文件
+src-tauri/gen/schemas/
+
+# ===== 日志与环境文件 =====
+.env
+*.log
+
+# ===== 项目本地文档 =====
+# 内部迁移与实施记录，不入库
+AGENTS.md
+优化.md
+docs/开发计划.md
+
+# ===== 本地工具与测试残留 =====
+.zcodeignore
+.playwright-mcp/

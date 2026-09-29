@@ -1,0 +1,208 @@
+name: CI/CD
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.jobName }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+            artifact: windows-amd64
+            portableOS: windows
+            portableArch: amd64
+            jobName: Windows amd64 打包
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            bundles: nsis
+            artifact: windows-arm64
+            portableOS: windows
+            portableArch: arm64
+            jobName: Windows arm64 打包
+          - os: macos-14
+            target: x86_64-apple-darwin
+            bundles: dmg
+            artifact: macos-amd64
+            portableOS: macos
+            portableArch: amd64
+            jobName: macOS amd64 打包
+          - os: macos-14
+            target: aarch64-apple-darwin
+            bundles: dmg
+            artifact: macos-arm64
+            portableOS: macos
+            portableArch: arm64
+            jobName: macOS arm64 打包
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb rpm
+            artifact: linux-amd64
+            portableOS: linux
+            portableArch: amd64
+            jobName: Linux amd64 打包（deb + rpm）
+          - os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            bundles: deb rpm
+            artifact: linux-arm64
+            portableOS: linux
+            portableArch: arm64
+            jobName: Linux arm64 打包（deb + rpm）
+    runs-on: ${{ matrix.os }}
+    env:
+      VITE_SYNC_GITHUB_CLIENT_ID: ${{ secrets.VITE_SYNC_GITHUB_CLIENT_ID }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: 安装 Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: 安装 Rust 工具链
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: 缓存 Rust 构建产物
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      - name: 安装 Linux 系统依赖
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev rpm
+
+      - name: 安装前端依赖
+        run: npm ci
+
+      - name: 构建桌面应用
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+      - name: 收集安装包与便携二进制并生成校验和
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          TARGET="${{ matrix.target }}"
+          PORTABLE_OS="${{ matrix.portableOS }}"
+          PORTABLE_ARCH="${{ matrix.portableArch }}"
+          mkdir -p release-assets
+          find "src-tauri/target/${TARGET}/release/bundle" -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.deb" -o -name "*.rpm" \) -exec cp {} release-assets/ \;
+
+          BIN="src-tauri/target/${TARGET}/release/picbed-switcher"
+          case "${PORTABLE_OS}" in
+            windows) BIN="src-tauri/target/${TARGET}/release/picbed-switcher.exe" ;;
+          esac
+          PORTABLE_DIR="picbed-switcher_${VERSION}_${PORTABLE_OS}_${PORTABLE_ARCH}"
+          mkdir -p "${PORTABLE_DIR}"
+          cp "${BIN}" "${PORTABLE_DIR}/"
+          if [ "${PORTABLE_OS}" = "macos" ]; then
+            DMG_FILE=$(find "src-tauri/target/${TARGET}/release/bundle" -type f -name "*.dmg" 2>/dev/null | head -1)
+            if [ -z "${DMG_FILE}" ]; then
+              echo "⚠️ 未找到 dmg 产物，无法制作便携包"
+              exit 1
+            fi
+            MNT_DIR=$(mktemp -d)
+            hdiutil attach -nobrowse -readonly -mountpoint "${MNT_DIR}" "${DMG_FILE}" >/dev/null
+            APP_DIR=$(find "${MNT_DIR}" -maxdepth 2 -type d -name "*.app" | head -1)
+            cp -R "${APP_DIR}" "${PORTABLE_DIR}/"
+            hdiutil detach "${MNT_DIR}" >/dev/null
+            rm -f "${PORTABLE_DIR}/picbed-switcher"
+            printf '解压后将 "PicBed Switcher.app" 拖入「应用程序」目录即可使用；首次打开如提示无法验证开发者，请在「系统设置 → 隐私与安全性」中允许。\n' > "${PORTABLE_DIR}/README.txt"
+            tar -czf "release-assets/picbed-switcher_${VERSION}_${PORTABLE_OS}_${PORTABLE_ARCH}.tar.gz" -C "${PORTABLE_DIR}" .
+          elif [ "${PORTABLE_OS}" = "windows" ]; then
+            printf '解压后将 picbed-switcher.exe 放到任意目录运行；需要系统已安装 WebView2 运行时（Windows 10/11 一般自带）。\r\n' > "${PORTABLE_DIR}/README.txt"
+            powershell.exe -NoProfile -Command "Compress-Archive -Path '${PORTABLE_DIR}\\*' -DestinationPath 'release-assets\\picbed-switcher_${VERSION}_${PORTABLE_OS}_${PORTABLE_ARCH}.zip' -Force"
+          else
+            printf '解压后将 picbed-switcher 放到任意目录运行；需要系统已安装 WebKitGTK 4.1 运行时（Ubuntu/Debian: sudo apt-get install libwebkit2gtk-4.1-0）。\n' > "${PORTABLE_DIR}/README.txt"
+            tar -czf "release-assets/picbed-switcher_${VERSION}_${PORTABLE_OS}_${PORTABLE_ARCH}.tar.gz" -C "${PORTABLE_DIR}" .
+          fi
+          rm -rf "${PORTABLE_DIR}"
+
+          cd release-assets
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum * > "SHA256SUMS_${{ matrix.artifact }}.txt"
+          else
+            shasum -a 256 * > "SHA256SUMS_${{ matrix.artifact }}.txt"
+          fi
+          cd ..
+          echo "📦 本次产物："
+          ls -la release-assets
+
+      - name: 生成发布说明
+        id: changelog
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges -10)
+          if [[ "$VERSION" =~ (alpha|beta|rc|pre) ]]; then
+            IS_PRERELEASE="true"
+            echo "📦 检测到预发布版本: v${VERSION}"
+          else
+            IS_PRERELEASE="false"
+            echo "🚀 正式版本: v${VERSION}"
+          fi
+          echo "is_prerelease=${IS_PRERELEASE}" >> $GITHUB_OUTPUT
+          cat > release_notes.md << EOF
+          ## 🎉 PicBed Switcher Desktop v${VERSION} 发布
+
+          ### 📋 构建信息
+          - **版本**: v${VERSION}
+          - **Commit**: ${GITHUB_SHA:0:7}
+          - **构建时间**: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          ### 📝 更新内容
+          ${COMMITS}
+
+          ### 📦 安装包下载
+          - Windows AMD64: \`PicBed Switcher_${VERSION}_x64-setup.exe\`
+          - Windows ARM64: \`PicBed Switcher_${VERSION}_arm64-setup.exe\`
+          - macOS Intel: \`PicBed Switcher_${VERSION}_x64.dmg\`
+          - macOS Apple 芯片: \`PicBed Switcher_${VERSION}_aarch64.dmg\`
+          - Linux AMD64 (Ubuntu/Debian): \`PicBed Switcher_${VERSION}_amd64.deb\`
+          - Linux ARM64 (Ubuntu/Debian): \`PicBed Switcher_${VERSION}_arm64.deb\`
+          - Linux AMD64 (Fedora/RHEL): \`picbed-switcher-${VERSION}-1.x86_64.rpm\`
+          - Linux ARM64 (Fedora/RHEL): \`picbed-switcher-${VERSION}-1.aarch64.rpm\`
+
+          ### 🗂️ 便携版（免安装）
+          - Windows AMD64: \`picbed-switcher_${VERSION}_windows_amd64.zip\`
+          - Windows ARM64: \`picbed-switcher_${VERSION}_windows_arm64.zip\`
+          - macOS Intel: \`picbed-switcher_${VERSION}_macos_amd64.tar.gz\`
+          - macOS Apple 芯片: \`picbed-switcher_${VERSION}_macos_arm64.tar.gz\`
+          - Linux AMD64: \`picbed-switcher_${VERSION}_linux_amd64.tar.gz\`
+          - Linux ARM64: \`picbed-switcher_${VERSION}_linux_arm64.tar.gz\`
+
+          ### 🔐 校验和
+          各架构校验和文件以 \`SHA256SUMS_<平台>.txt\` 命名，下载后执行 \`sha256sum -c SHA256SUMS_<平台>.txt\` 验证完整性。
+
+          详细更新日志见仓库 \`verchanglog/v${VERSION}.md\`。
+          EOF
+
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: release_notes.md
+          draft: false
+          prerelease: ${{ steps.changelog.outputs.is_prerelease == 'true' }}
+          generate_release_notes: false
+          files: release-assets/**
