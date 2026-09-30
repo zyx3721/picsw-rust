@@ -799,8 +799,11 @@ svg {
   background: #fef2f2;
 }
 .sync-banner.banner-blocked {
-  border-color: #fed7aa;
-  background: #fff7ed;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.banner-blocked .sync-banner-alert-icon {
+  color: var(--danger);
 }
 .sync-banner.banner-empty {
   border-color: #fecaca;

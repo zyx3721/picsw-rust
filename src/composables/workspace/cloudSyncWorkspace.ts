@@ -30,6 +30,8 @@ export type SyncBannerKind = 'conflict' | 'blocked' | 'empty';
 export type SyncBanner = {
   kind: SyncBannerKind;
   message: string;
+  /** blocked：缩减明细正文（基准到推送结果的条数变化） */
+  detail?: string;
   remoteItems: RemoteConfigPreview[];
   remoteSignature: string;
   remoteVersion: number;
@@ -919,7 +921,8 @@ export function useWorkspaceCloudSync({
         if (baseMap.size > 0 && (lost >= 10 || (lost >= 2 && lost >= Math.ceil(baseMap.size * 0.3)))) {
           syncBanner.value = {
             kind: 'blocked',
-            message: `同步被拦截：本机比基准少 ${lost} 个配置，可能存在数据丢失`,
+            message: '同步被拦截：本次推送会删除过多数据',
+            detail: `图床配置从 ${baseMap.size} 条减少到 ${localItems.length} 条（丢失 ${lost} 条）。可能是本机数据异常，为保护云端已拦截自动推送。`,
             remoteItems: [...baseMap.values()],
             remoteSignature: signature,
             remoteVersion: vault.version,
@@ -1037,7 +1040,8 @@ export function useWorkspaceCloudSync({
       if (lost >= 10 || (lost >= 2 && lost >= Math.ceil(referenceCount * 0.3))) {
         syncBanner.value = {
           kind: 'blocked',
-          message: `同步被拦截：合并结果比基准少 ${lost} 个配置，可能存在数据丢失`,
+          message: '同步被拦截：本次推送会删除过多数据',
+          detail: `图床配置从 ${referenceCount} 条减少到 ${merged.length} 条（丢失 ${lost} 条）。可能是本机数据异常，为保护云端已拦截自动推送。`,
           remoteItems,
           remoteSignature: signature,
           remoteVersion: vault.version,

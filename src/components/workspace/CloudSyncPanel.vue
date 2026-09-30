@@ -107,7 +107,7 @@ function submitUnlock() {
     <div v-if="syncBanner" class="sync-banner" :class="`banner-${syncBanner.kind}`">
       <div class="sync-banner-body">
         <span class="sync-banner-text">
-          <AlertTriangle v-if="syncBanner.kind === 'empty'" :size="15" class="sync-banner-alert-icon" />{{ syncBanner.message }}
+          <AlertTriangle v-if="syncBanner.kind !== 'conflict'" :size="15" class="sync-banner-alert-icon" />{{ syncBanner.message }}
         </span>
         <span v-if="syncBanner.kind === 'conflict'" class="sync-banner-detail">
           云端版本 v{{ syncBanner.remoteVersion }}<template v-if="syncBanner.remoteDeviceName">（{{ syncBanner.remoteDeviceName }}）</template>，本机版本 v{{ syncBanner.localVersion }}。两台设备的同步密码不同。
@@ -115,6 +115,7 @@ function submitUnlock() {
         <span v-if="syncBanner.kind === 'empty'" class="sync-banner-detail">
           本机没有图床配置，云端存在 {{ syncBanner.remoteItems.length }} 条图床配置（配置内容已端到端加密，云端只存密文）。为防止误覆盖云端，请选择如何处理：
         </span>
+        <span v-if="syncBanner.kind === 'blocked'" class="sync-banner-detail">{{ syncBanner.detail }}</span>
       </div>
       <div class="sync-banner-actions">
         <button
@@ -144,7 +145,7 @@ function submitUnlock() {
         </button>
         <button
           v-if="syncBanner.kind === 'blocked'"
-          class="info"
+          class="danger"
           type="button"
           :disabled="syncBusy"
           @click="forcePushLocal"
