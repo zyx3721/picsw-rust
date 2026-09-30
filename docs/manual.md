@@ -65,10 +65,12 @@
 
 ### 1.7 关于
 
-「关于」页签展示应用信息：
+「关于」页签以卡片形式展示版本与项目信息，各卡片左侧带图标：
 
-- 版本行显示当前安装的 PicBed Switcher Desktop 版本号
-- GitHub 行为项目地址入口，点击右侧「github.com/zyx3721/picsw-rust」可在系统浏览器打开仓库主页，欢迎 Star 与 Issue 反馈
+- 版本卡片显示当前安装的 PicBed Switcher Desktop 版本号
+- GitHub 卡片为项目地址入口，点击右侧「github.com/zyx3721/picsw-rust」可在系统浏览器打开仓库主页，欢迎 Star
+- 反馈问题卡片点击右侧「github.com/zyx3721/picsw-rust/issues」打开问题反馈页，可报告 Bug 或提出建议
+- 更新内容卡片点击右侧「github.com/zyx3721/picsw-rust/releases」打开发布说明页，查看各版本更新内容
 
 标题行右侧为「检查更新」按钮：
 

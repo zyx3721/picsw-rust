@@ -1156,6 +1156,31 @@ svg {
   color: var(--muted);
   font-size: 12px;
 }
+.about-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.about-row-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+.about-row-icon svg {
+  display: block;
+}
+.about-title-hint {
+  margin-left: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
 .about-version {
   color: var(--muted);
   font-size: 13px;

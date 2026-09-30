@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { Download, ExternalLink, RefreshCw } from 'lucide-vue-next';
+import { Bug, Code2, Download, ExternalLink, FileText, Package, RefreshCw } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 
 const GITHUB_URL = 'https://github.com/zyx3721/picsw-rust';
+const ISSUES_URL = 'https://github.com/zyx3721/picsw-rust/issues';
+const RELEASES_URL = 'https://github.com/zyx3721/picsw-rust/releases';
 const { showError, updateStatus, updateVersion, checkUpdate, startUpdate } = useWorkspaceContext();
 
 const appVersion = ref('');
@@ -37,13 +39,28 @@ async function handleUpdateClick() {
   await checkUpdate();
 }
 
-/// 在系统浏览器打开项目仓库主页
-async function openGithubRepo() {
+/// 在系统浏览器打开外部链接
+async function openExternal(url: string, fallback: string) {
   try {
-    await openUrl(GITHUB_URL);
+    await openUrl(url);
   } catch (error) {
-    showError(error instanceof Error ? error.message : '打开项目主页失败');
+    showError(error instanceof Error ? error.message : fallback);
   }
+}
+
+/// 打开项目仓库主页
+async function openGithubRepo() {
+  await openExternal(GITHUB_URL, '打开项目主页失败');
+}
+
+/// 打开问题反馈页
+async function openIssues() {
+  await openExternal(ISSUES_URL, '打开反馈页失败');
+}
+
+/// 打开发布说明页
+async function openReleases() {
+  await openExternal(RELEASES_URL, '打开发布页失败');
 }
 </script>
 
@@ -53,7 +70,7 @@ async function openGithubRepo() {
     <div class="section-title">
       <div>
         <p class="section-kicker">About</p>
-        <h2>关于</h2>
+        <h2>关于<span class="about-title-hint">版本与项目信息</span></h2>
       </div>
       <div class="about-update-area">
         <span v-if="updateStatus === 'available' && updateVersion" class="about-update-tag">检测到新版本： v{{ updateVersion }}</span>
@@ -65,19 +82,53 @@ async function openGithubRepo() {
     </div>
 
     <div class="about-row">
-      <div class="about-row-info">
-        <strong>PicBed Switcher 版本</strong>
+      <div class="about-row-main">
+        <span class="about-row-icon"><Package :size="20" /></span>
+        <div class="about-row-info">
+          <strong>PicBed Switcher 版本</strong>
+        </div>
       </div>
       <span class="about-version">{{ appVersion || '—' }}</span>
     </div>
 
     <div class="about-row">
-      <div class="about-row-info">
-        <strong>GitHub</strong>
-        <span>项目地址，欢迎 Star / 反馈 Issue</span>
+      <div class="about-row-main">
+        <span class="about-row-icon"><Code2 :size="20" /></span>
+        <div class="about-row-info">
+          <strong>GitHub</strong>
+          <span>源代码，欢迎 Star</span>
+        </div>
       </div>
       <button class="about-link" type="button" @click="openGithubRepo">
         github.com/zyx3721/picsw-rust
+        <ExternalLink :size="14" />
+      </button>
+    </div>
+
+    <div class="about-row">
+      <div class="about-row-main">
+        <span class="about-row-icon"><Bug :size="20" /></span>
+        <div class="about-row-info">
+          <strong>反馈问题</strong>
+          <span>报告 Bug 或提出建议</span>
+        </div>
+      </div>
+      <button class="about-link" type="button" @click="openIssues">
+        github.com/zyx3721/picsw-rust/issues
+        <ExternalLink :size="14" />
+      </button>
+    </div>
+
+    <div class="about-row">
+      <div class="about-row-main">
+        <span class="about-row-icon"><FileText :size="20" /></span>
+        <div class="about-row-info">
+          <strong>更新内容</strong>
+          <span>查看发布说明</span>
+        </div>
+      </div>
+      <button class="about-link" type="button" @click="openReleases">
+        github.com/zyx3721/picsw-rust/releases
         <ExternalLink :size="14" />
       </button>
     </div>
