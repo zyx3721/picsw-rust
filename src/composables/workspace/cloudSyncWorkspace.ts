@@ -1102,7 +1102,7 @@ export function useWorkspaceCloudSync({
       const message = `同步完成：${parts.join('，')}，上传合并结果 ${merged.length} 个配置（版本 ${version}）${conflicts > 0 ? `；${conflicts} 处两侧均修改，以本地为准` : ''}`;
       showMessage(message);
     } catch (error) {
-      showError(error instanceof Error ? error.message : '立即同步失败');
+      if (!quiet) showError(error instanceof Error ? error.message : '立即同步失败');
     } finally {
       loadingEnd();
     }
@@ -1368,6 +1368,13 @@ export function useWorkspaceCloudSync({
     }
   }
 
+  /// 启动自动同步：连接与解锁就绪后先对齐一次云端（与自动同步开关无关，失败静默不阻塞启动）
+  async function startupAutoSync() {
+    await Promise.all([restoreConnection(), autoUnlockPassword()]);
+    if (!syncConnected.value || passwordStatus.value !== 'unlocked') return;
+    void syncNow(true);
+  }
+
   /// 阻塞与空库横幅：恢复远端版本（写入本机并采纳为 base）
   async function restoreRemoteVersion() {
     const banner = syncBanner.value;
@@ -1450,8 +1457,7 @@ export function useWorkspaceCloudSync({
     syncBusy.value = false;
   }
 
-  void restoreConnection();
-  void autoUnlockPassword();
+  void startupAutoSync();
 
   return {
     syncAccount,
