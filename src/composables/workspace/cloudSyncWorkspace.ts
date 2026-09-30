@@ -914,6 +914,19 @@ export function useWorkspaceCloudSync({
           if (!quiet) showMessage('本地与云端已一致，无需同步');
           return;
         }
+        // 收缩护栏：远端未变时本机大幅缩水（如误删）同样拦截，与合并路径口径一致
+        const lost = baseMap.size - localItems.length;
+        if (baseMap.size > 0 && (lost >= 10 || (lost >= 2 && lost >= Math.ceil(baseMap.size * 0.3)))) {
+          syncBanner.value = {
+            kind: 'blocked',
+            message: `同步被拦截：本机比基准少 ${lost} 个配置，可能存在数据丢失`,
+            remoteItems: [...baseMap.values()],
+            remoteSignature: signature,
+            remoteVersion: vault.version,
+          };
+          showMessage('同步被拦截，请在横幅中选择恢复云端数据或强制推送');
+          return;
+        }
         const version = vault.version + 1;
         const vaultContent = await uploadPayload(localItems, version);
         saveBase(localItems);
@@ -1029,7 +1042,7 @@ export function useWorkspaceCloudSync({
           remoteSignature: signature,
           remoteVersion: vault.version,
         };
-        showMessage('同步被拦截，请在横幅中选择恢复远端版本或强制推送');
+        showMessage('同步被拦截，请在横幅中选择恢复云端数据或强制推送');
         return;
       }
 

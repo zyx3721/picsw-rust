@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { Trash2 } from 'lucide-vue-next';
+import { nextTick, ref, watch } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 
 const { deleteTarget, loading, cancelDeleteConfig, confirmDeleteConfig } = useWorkspaceContext();
+const confirmButton = ref<HTMLButtonElement | null>(null);
+
+/// 弹窗打开时聚焦删除按钮，按回车即执行删除
+watch(deleteTarget, open => {
+  if (open) void nextTick(() => confirmButton.value?.focus());
+});
 </script>
 
 <template>
@@ -15,7 +22,7 @@ const { deleteTarget, loading, cancelDeleteConfig, confirmDeleteConfig } = useWo
       </div>
       <div class="dialog-actions">
         <button class="ghost" type="button" @click="cancelDeleteConfig">取消</button>
-        <button class="danger" type="button" :disabled="loading" @click="confirmDeleteConfig">
+        <button ref="confirmButton" class="danger" type="button" :disabled="loading" @click="confirmDeleteConfig">
           <Trash2 :size="17" />删除
         </button>
       </div>
