@@ -77,6 +77,8 @@ export function createWorkspaceRequest() {
           return await invoke<T>('download_remote_images', { urls: body.urls || [], targetDir: body.target_dir || '' });
         case 'GET /api/app/update-runtime':
           return await invoke<T>('get_update_runtime');
+        case 'GET /api/app/update-latest':
+          return await invoke<T>('get_update_latest');
         case 'POST /api/app/update/download':
           return await invoke<T>('download_update', { url: body.url || '', checksumUrl: body.checksum_url || '', assetName: body.asset_name || '' });
         case 'POST /api/app/update/apply':
