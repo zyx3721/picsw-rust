@@ -1418,16 +1418,12 @@ export function useWorkspaceCloudSync({
       await commitLastSync(version);
       syncRemoteState.value = { version, updatedAt: Date.now(), configCount: items.length };
       syncBanner.value = null;
-      showMessage(`已强制推送本机 ${items.length} 个配置（版本 ${version}）`);
+      showMessage('已强制推送本地数据');
     } catch (error) {
       showError(error instanceof Error ? error.message : '强制推送失败');
     } finally {
       loadingEnd();
     }
-  }
-
-  function dismissSyncBanner() {
-    syncBanner.value = null;
   }
 
   function loadingStart() {
@@ -1460,7 +1456,6 @@ export function useWorkspaceCloudSync({
     resolveConflictWithCloudPassword,
     restoreRemoteVersion,
     forcePushLocal,
-    dismissSyncBanner,
     passwordStatus,
     passwordBackend,
     lockSyncPassword,

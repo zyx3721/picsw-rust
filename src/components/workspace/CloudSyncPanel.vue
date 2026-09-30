@@ -23,7 +23,6 @@ const {
   pushEmptyVaultLocal,
   restoreRemoteVersion,
   forcePushLocal,
-  dismissSyncBanner,
   showError,
   passwordStatus,
   passwordBackend,
@@ -140,14 +139,18 @@ function submitUnlock() {
           type="button"
           :disabled="syncBusy"
           @click="restoreRemoteVersion"
-        >恢复远端版本</button>
+        >
+          <Download :size="16" />恢复云端数据
+        </button>
         <button
           v-if="syncBanner.kind === 'blocked'"
-          class="danger"
+          class="info"
           type="button"
           :disabled="syncBusy"
           @click="forcePushLocal"
-        >强制推送</button>
+        >
+          <Upload :size="16" />强制推送
+        </button>
         <button
           v-if="syncBanner.kind === 'empty'"
           class="secondary"
@@ -166,13 +169,6 @@ function submitUnlock() {
         >
           <Upload :size="16" />推送本机数据
         </button>
-        <button
-          v-if="syncBanner.kind === 'blocked'"
-          class="ghost"
-          type="button"
-          :disabled="syncBusy"
-          @click="dismissSyncBanner"
-        >取消</button>
       </div>
     </div>
 
