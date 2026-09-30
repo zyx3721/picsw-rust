@@ -25,6 +25,8 @@ const {
   dismissSyncBanner,
   showError,
   passwordStatus,
+  passwordBackend,
+  lockSyncPassword,
   passwordModalOpen,
   openPasswordModal,
   openCloudPwdModal,
@@ -187,9 +189,10 @@ function submitUnlock() {
         <span class="sync-row-icon"><KeyRound :size="20" /></span>
         <div>
           <strong>同步密码</strong>
-          <span v-if="passwordStatus === 'none'">用于加密云端数据，密码不保存在本机（遗忘后云端数据无法恢复）</span>
-          <span v-else-if="passwordStatus === 'locked'">输入密码解锁后才能同步</span>
-          <span v-else>密码仅在本次运行内存中持有</span>
+          <span v-if="passwordStatus === 'none'">用于端到端加密云端数据（遗忘后云端数据无法恢复）</span>
+          <span v-else-if="passwordStatus === 'locked'">解锁后本机会记住密码，下次启动自动解锁</span>
+          <span v-else-if="passwordBackend">密码已记住到本机密钥库，启动时自动解锁</span>
+          <span v-else>密码仅在本次运行内存中持有（本机密钥库不可用）</span>
         </div>
       </div>
       <div class="sync-row-actions">
@@ -219,6 +222,15 @@ function submitUnlock() {
           <span class="sync-state-tag ok">已解锁</span>
           <button class="secondary" type="button" :disabled="syncBusy" @click="openPasswordModal('change')">
             <KeyRound :size="17" />修改密码
+          </button>
+          <button
+            class="secondary"
+            type="button"
+            :disabled="syncBusy"
+            title="锁定并清除本机记住的密码（下次启动需手动解锁）"
+            @click="lockSyncPassword"
+          >
+            <Lock :size="17" />锁定
           </button>
         </template>
       </div>

@@ -67,6 +67,12 @@ export function createWorkspaceRequest() {
           return await invoke<T>('list_records');
         case 'GET /api/sync/github-client-id':
           return await invoke<T>('sync_github_client_id');
+        case 'POST /api/sync/password-credential':
+          return await invoke<T>('sync_save_sync_password', { plaintext: body.password || '' });
+        case 'POST /api/sync/password-credential/load':
+          return await invoke<T>('sync_load_sync_password', { backend: body.backend || '' });
+        case 'DELETE /api/sync/password-credential':
+          return await invoke<T>('sync_delete_sync_password', { backend: body.backend || '' });
         case 'DELETE /api/convert/records':
           return await invoke<T>('delete_records', { req: body });
         case 'POST /api/convert/analyze':

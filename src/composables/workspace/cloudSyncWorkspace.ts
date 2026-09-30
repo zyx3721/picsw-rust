@@ -16,6 +16,7 @@ const LAST_SYNC_STORAGE_KEY = 'picbed_sync_last_sync';
 const ACCOUNT_STORAGE_KEY = 'picbed_sync_github_account';
 const GIST_ID_STORAGE_KEY = 'picbed_sync_gist_id';
 const PASSWORD_HINT_STORAGE_KEY = 'picbed_sync_password_hint';
+const PASSWORD_BACKEND_STORAGE_KEY = 'picbed_sync_password_backend';
 const AUTO_SYNC_STORAGE_KEY = 'picbed_sync_auto';
 const BASE_STORAGE_KEY = 'picbed_sync_base';
 const ANCHOR_STORAGE_KEY = 'picbed_sync_anchor';
@@ -156,6 +157,7 @@ export function useWorkspaceCloudSync({
   const syncRemoteState = ref<SyncRemoteState>(null);
   const syncBusy = ref(false);
   const passwordHintHash = ref(localStorage.getItem(PASSWORD_HINT_STORAGE_KEY) || '');
+  const passwordBackend = ref(localStorage.getItem(PASSWORD_BACKEND_STORAGE_KEY) || '');
   const passwordModalOpen = ref(false);
   const passwordModalMode = ref<'set' | 'change'>('set');
   const cloudPwdModalOpen = ref(false);
@@ -640,13 +642,66 @@ export function useWorkspaceCloudSync({
     cloudPwdModalOpen.value = false;
   }
 
+  /// 解锁/设密成功后把密码记住到本机密钥库（钥匙串优先），失败降级为仅内存持有
+  async function rememberSyncPassword(password: string): Promise<void> {
+    try {
+      const backend = await request<string>('/api/sync/password-credential', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      });
+      passwordBackend.value = backend;
+      localStorage.setItem(PASSWORD_BACKEND_STORAGE_KEY, backend);
+    } catch {
+      passwordBackend.value = '';
+      localStorage.removeItem(PASSWORD_BACKEND_STORAGE_KEY);
+    }
+  }
+
+  /// 清除本机记住的同步密码（密钥库条目不存在或不可用时视为已清除）
+  async function forgetStoredPassword(): Promise<void> {
+    const backend = passwordBackend.value;
+    passwordBackend.value = '';
+    localStorage.removeItem(PASSWORD_BACKEND_STORAGE_KEY);
+    if (!backend) return;
+    await request<void>('/api/sync/password-credential', {
+      method: 'DELETE',
+      body: JSON.stringify({ backend }),
+    }).catch(() => undefined);
+  }
+
+  /// 启动自动解锁：读取记住的密码并与提示哈希比对，失效即清除记忆，密钥库不可用则保持锁定
+  async function autoUnlockPassword(): Promise<void> {
+    const backend = localStorage.getItem(PASSWORD_BACKEND_STORAGE_KEY);
+    if (!backend || !passwordHintHash.value || syncPassword.value) return;
+    const stored = await request<string | null>('/api/sync/password-credential/load', {
+      method: 'POST',
+      body: JSON.stringify({ backend }),
+    }).catch(() => undefined);
+    if (!stored) return;
+    if (sha256HexSync(stored) === passwordHintHash.value) {
+      syncPassword.value = stored;
+      passwordBackend.value = backend;
+    } else {
+      passwordBackend.value = backend;
+      await forgetStoredPassword();
+    }
+  }
+
+  /// 锁定同步：清空内存密码并清除本机记住的密码，下次启动需手动解锁
+  function lockSyncPassword(): void {
+    syncPassword.value = '';
+    void forgetStoredPassword();
+    showMessage('已锁定并清除记住的同步密码');
+  }
+
   /// 行内解锁：锁定态直接在同步密码行输入解锁，不再弹窗；
-  /// 校验通过后仅在内存持有密码，并立即同步一次对齐云端
+  /// 校验通过后记住密码到本机密钥库，并立即同步一次对齐云端
   function unlockWithPassword(password: string): string | null {
     if (sha256HexSync(password) !== passwordHintHash.value) {
       return '同步密码不正确';
     }
     syncPassword.value = password;
+    void rememberSyncPassword(password);
     if (syncConnected.value) void syncNow();
     return null;
   }
@@ -664,6 +719,7 @@ export function useWorkspaceCloudSync({
     syncPassword.value = password;
     passwordHintHash.value = sha256HexSync(password);
     localStorage.setItem(PASSWORD_HINT_STORAGE_KEY, passwordHintHash.value);
+    void rememberSyncPassword(password);
     passwordModalOpen.value = false;
     if (mode === 'set') {
       if (syncConnected.value) void syncNow();
@@ -1309,6 +1365,7 @@ export function useWorkspaceCloudSync({
       syncPassword.value = cloudPassword;
       passwordHintHash.value = sha256HexSync(cloudPassword);
       localStorage.setItem(PASSWORD_HINT_STORAGE_KEY, passwordHintHash.value);
+      void rememberSyncPassword(cloudPassword);
       saveBase(configs);
       await saveAnchor({ signature: banner.remoteSignature, version: banner.remoteVersion, updatedAt: Date.now() });
       await commitLastSync(banner.remoteVersion);
@@ -1358,6 +1415,7 @@ export function useWorkspaceCloudSync({
   }
 
   void restoreConnection();
+  void autoUnlockPassword();
 
   return {
     syncAccount,
@@ -1380,6 +1438,8 @@ export function useWorkspaceCloudSync({
     forcePushLocal,
     dismissSyncBanner,
     passwordStatus,
+    passwordBackend,
+    lockSyncPassword,
     passwordModalOpen,
     passwordModalMode,
     openPasswordModal,
