@@ -4,7 +4,7 @@ import AppTooltip from '../AppTooltip.vue';
 import SyncPasswordDialog from '../dialogs/SyncPasswordDialog.vue';
 import GithubConnectDialog from '../dialogs/GithubConnectDialog.vue';
 import CloudPasswordDialog from '../dialogs/CloudPasswordDialog.vue';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 
 const {
@@ -53,6 +53,13 @@ const {
 
 const unlockInput = ref('');
 const restoreConfirmArmed = ref(false);
+
+/// 恢复预览：所选修订配置数少于当前时返回缩减条数（用于红色标注）
+const revisionShrink = computed(() => {
+  const preview = revisionPreview.value;
+  if (!preview) return 0;
+  return Math.max(preview.currentCount - preview.configCount, 0);
+});
 
 watch(syncHistoryOpen, open => {
   if (!open) restoreConfirmArmed.value = false;
@@ -220,18 +227,16 @@ function submitUnlock() {
         </template>
         <template v-else>
           <span class="sync-state-tag ok">已解锁</span>
-          <button class="secondary" type="button" :disabled="syncBusy" @click="openPasswordModal('change')">
-            <KeyRound :size="17" />修改密码
-          </button>
-          <button
-            class="secondary"
-            type="button"
-            :disabled="syncBusy"
-            title="锁定并清除本机记住的密码（下次启动需手动解锁）"
-            @click="lockSyncPassword"
-          >
-            <Lock :size="17" />锁定
-          </button>
+          <AppTooltip label="修改同步密码" center>
+            <button class="secondary" type="button" :disabled="syncBusy" @click="openPasswordModal('change')">
+              <KeyRound :size="17" />修改密码
+            </button>
+          </AppTooltip>
+          <AppTooltip label="锁定并清除本机记住的密码（下次启动需手动解锁）" center>
+            <button class="secondary" type="button" :disabled="syncBusy" @click="lockSyncPassword">
+              <Lock :size="17" />锁定
+            </button>
+          </AppTooltip>
         </template>
       </div>
     </div>
@@ -334,7 +339,9 @@ function submitUnlock() {
                 <p class="sync-history-preview-title">
                   <AlertTriangle :size="14" />恢复预览 —— 整体覆盖，不是合并
                 </p>
-                <p>图床配置：{{ revisionPreview.currentCount }} → {{ revisionPreview.configCount }} 条</p>
+                <p>
+                  图床配置：<span :class="{ 'sync-preview-shrink': revisionShrink > 0 }">{{ revisionPreview.currentCount }}</span> → {{ revisionPreview.configCount }} 条<template v-if="revisionShrink > 0"><span class="sync-preview-shrink">（将减少 {{ revisionShrink }} 条）</span></template>
+                </p>
                 <p>
                   来源：版本 v{{ revisionPreview.version }}<template v-if="revisionPreview.deviceName"> · {{ revisionPreview.deviceName }}</template><template v-if="revisionPreview.appVersion">（{{ revisionPreview.appVersion }}）</template> · 数据时间 {{ revisionPreview.updatedAtText }}
                 </p>

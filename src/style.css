@@ -993,6 +993,10 @@ svg {
   font-size: 12px;
   line-height: 1.6;
 }
+.sync-preview-shrink {
+  color: var(--danger);
+  font-weight: 650;
+}
 .sync-history-preview-card p {
   margin: 0;
 }

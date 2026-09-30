@@ -723,6 +723,7 @@ export function useWorkspaceCloudSync({
     passwordModalOpen.value = false;
     if (mode === 'set') {
       if (syncConnected.value) void syncNow();
+      showMessage('同步密码已配置');
       return null;
     }
     showMessage('同步密码已修改，云端数据将在下次配置变更同步时将以新密码加密');
