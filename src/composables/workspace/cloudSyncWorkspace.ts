@@ -964,7 +964,7 @@ export function useWorkspaceCloudSync({
       if (baseMap.size === 0 && localItems.length === 0 && remoteItems.length > 0) {
         syncBanner.value = {
           kind: 'empty',
-          message: `本地没有图床配置而云端有 ${remoteItems.length} 个，恢复后将写入本机`,
+          message: '发现云端备份',
           remoteItems,
           remoteSignature: signature,
           remoteVersion: vault.version,
@@ -1329,6 +1329,28 @@ export function useWorkspaceCloudSync({
     }
   }
 
+  /// 空库横幅：确认以本机当前（空）配置推送云端，作为新版本覆盖
+  async function pushEmptyVaultLocal() {
+    const banner = syncBanner.value;
+    if (!banner || banner.kind !== 'empty') return;
+    loadingStart();
+    try {
+      const items = configs.value.map(syncItemOf);
+      const version = banner.remoteVersion + 1;
+      const vaultContent = await uploadPayload(items, version);
+      saveBase(items);
+      await saveAnchor({ signature: await sha256Hex(vaultContent), version, updatedAt: Date.now() });
+      await commitLastSync(version);
+      syncRemoteState.value = { version, updatedAt: Date.now(), configCount: items.length };
+      syncBanner.value = null;
+      showMessage('已推送本机数据');
+    } catch (error) {
+      showError(error instanceof Error ? error.message : '推送本机数据失败');
+    } finally {
+      loadingEnd();
+    }
+  }
+
   /// 阻塞与空库横幅：恢复远端版本（写入本机并采纳为 base）
   async function restoreRemoteVersion() {
     const banner = syncBanner.value;
@@ -1341,7 +1363,7 @@ export function useWorkspaceCloudSync({
       await commitLastSync(banner.remoteVersion);
       syncRemoteState.value = { version: banner.remoteVersion, updatedAt: Date.now(), configCount: banner.remoteItems.length };
       syncBanner.value = null;
-      showMessage(`已恢复远端版本（${banner.remoteItems.length} 个配置）`);
+      showMessage(banner.kind === 'empty' ? '已拉取云端数据' : `已恢复远端版本（${banner.remoteItems.length} 个配置）`);
     } catch (error) {
       showError(error instanceof Error ? error.message : '恢复远端版本失败');
     } finally {
@@ -1434,6 +1456,7 @@ export function useWorkspaceCloudSync({
     syncNow,
     syncBanner,
     overrideCloudWithLocal,
+    pushEmptyVaultLocal,
     resolveConflictWithCloudPassword,
     restoreRemoteVersion,
     forcePushLocal,

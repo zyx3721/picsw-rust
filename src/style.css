@@ -803,8 +803,13 @@ svg {
   background: #fff7ed;
 }
 .sync-banner.empty {
-  border-color: var(--border);
-  background: var(--surface-muted);
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+.sync-banner-alert-icon {
+  color: var(--warning);
+  margin-right: 6px;
+  vertical-align: -2px;
 }
 .sync-banner-body {
   display: grid;
@@ -838,6 +843,14 @@ svg {
 }
 .sync-banner-actions .warn:hover:not(:disabled) {
   background: #fde68a;
+}
+.sync-banner-actions .info {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+}
+.sync-banner-actions .info:hover:not(:disabled) {
+  background: #bfdbfe;
 }
 .sync-badge {
   color: var(--muted);

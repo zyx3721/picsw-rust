@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AlertTriangle, Cloud, Database, Download, History, KeyRound, Lock, RefreshCw, Trash2, X, Zap } from 'lucide-vue-next';
+import { AlertTriangle, Cloud, Database, Download, History, KeyRound, Lock, RefreshCw, Trash2, Upload, X, Zap } from 'lucide-vue-next';
 import AppTooltip from '../AppTooltip.vue';
 import SyncPasswordDialog from '../dialogs/SyncPasswordDialog.vue';
 import GithubConnectDialog from '../dialogs/GithubConnectDialog.vue';
@@ -20,6 +20,7 @@ const {
   syncNow,
   syncBanner,
   overrideCloudWithLocal,
+  pushEmptyVaultLocal,
   restoreRemoteVersion,
   forcePushLocal,
   dismissSyncBanner,
@@ -106,9 +107,14 @@ function submitUnlock() {
 
     <div v-if="syncBanner" class="sync-banner" :class="syncBanner.kind">
       <div class="sync-banner-body">
-        <span class="sync-banner-text">{{ syncBanner.message }}</span>
+        <span class="sync-banner-text">
+          <AlertTriangle v-if="syncBanner.kind === 'empty'" :size="15" class="sync-banner-alert-icon" />{{ syncBanner.message }}
+        </span>
         <span v-if="syncBanner.kind === 'conflict'" class="sync-banner-detail">
           云端版本 v{{ syncBanner.remoteVersion }}<template v-if="syncBanner.remoteDeviceName">（{{ syncBanner.remoteDeviceName }}）</template>，本机版本 v{{ syncBanner.localVersion }}。两台设备的同步密码不同。
+        </span>
+        <span v-if="syncBanner.kind === 'empty'" class="sync-banner-detail">
+          本机没有图床配置，云端存在 {{ syncBanner.remoteItems.length }} 条图床配置（配置内容已端到端加密，云端只存密文）。为防止误覆盖云端，请选择如何处理：
         </span>
       </div>
       <div class="sync-banner-actions">
@@ -148,7 +154,18 @@ function submitUnlock() {
           type="button"
           :disabled="syncBusy"
           @click="restoreRemoteVersion"
-        >从云端恢复</button>
+        >
+          <Download :size="16" />恢复云端数据
+        </button>
+        <button
+          v-if="syncBanner.kind === 'empty'"
+          class="info"
+          type="button"
+          :disabled="syncBusy"
+          @click="pushEmptyVaultLocal"
+        >
+          <Upload :size="16" />推送本机数据
+        </button>
         <button
           v-if="syncBanner.kind !== 'conflict'"
           class="ghost"
