@@ -483,7 +483,7 @@ export function useWorkspaceCloudSync({
     syncAccount.value = displayName;
     showMessage(`已连接 GitHub 账号 ${displayName}`);
     await refreshRemoteState();
-    if (passwordStatus.value === 'unlocked' && autoSyncEnabled.value) scheduleAutoSyncRound();
+    if (passwordStatus.value === 'unlocked') void syncNow(true);
   }
 
   /// 打开连接弹窗：先取回设备码再弹窗（按钮呈加载态），无 client_id 时回退令牌粘贴模式
