@@ -105,7 +105,7 @@ function submitUnlock() {
       <span class="sync-badge">多台设备间加密同步配置（GitHub 私有 Gist）</span>
     </div>
 
-    <div v-if="syncBanner" class="sync-banner" :class="syncBanner.kind">
+    <div v-if="syncBanner" class="sync-banner" :class="`banner-${syncBanner.kind}`">
       <div class="sync-banner-body">
         <span class="sync-banner-text">
           <AlertTriangle v-if="syncBanner.kind === 'empty'" :size="15" class="sync-banner-alert-icon" />{{ syncBanner.message }}
@@ -167,7 +167,7 @@ function submitUnlock() {
           <Upload :size="16" />推送本机数据
         </button>
         <button
-          v-if="syncBanner.kind !== 'conflict'"
+          v-if="syncBanner.kind === 'blocked'"
           class="ghost"
           type="button"
           :disabled="syncBusy"

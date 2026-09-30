@@ -794,15 +794,15 @@ svg {
   border-radius: 10px;
   border: 1px solid;
 }
-.sync-banner.conflict {
+.sync-banner.banner-conflict {
   border-color: #fecaca;
   background: #fef2f2;
 }
-.sync-banner.blocked {
+.sync-banner.banner-blocked {
   border-color: #fed7aa;
   background: #fff7ed;
 }
-.sync-banner.empty {
+.sync-banner.banner-empty {
   border-color: #fecaca;
   background: #fef2f2;
 }
