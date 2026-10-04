@@ -8,6 +8,9 @@ use tauri::ipc::Channel;
 
 use super::{temp_update_dir, PROGRESS_EMIT_STEP_BYTES};
 
+/// 下载链接纵深防御：更新包与校验清单只接受本仓库 Release 附件地址
+const DOWNLOAD_URL_PREFIX: &str = "https://github.com/zyx3721/picsw-rust/releases/download/";
+
 /// 下载进度（total 为 0 表示服务端未返回长度）
 #[derive(Clone, serde::Serialize)]
 pub struct DownloadProgress {
@@ -57,6 +60,9 @@ pub async fn download_update(
         || asset_name.contains("..")
         || !url.rsplit('/').next().is_some_and(|tail| tail == asset_name)
     {
+        return Err("更新包地址不正确".to_string());
+    }
+    if !url.starts_with(DOWNLOAD_URL_PREFIX) || !checksum_url.starts_with(DOWNLOAD_URL_PREFIX) {
         return Err("更新包地址不正确".to_string());
     }
     let expected = fetch_expected_checksum(&checksum_url, &asset_name).await?;

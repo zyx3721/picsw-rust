@@ -5,15 +5,16 @@ import { ref } from 'vue';
 
 const RELEASE_PAGE_URL = 'https://github.com/zyx3721/picsw-rust/releases/latest';
 const RELEASE_DOWNLOAD_BASE = 'https://github.com/zyx3721/picsw-rust/releases/download';
-const AUTO_CHECK_DELAY_MS = 1000;
+const AUTO_CHECK_DELAY_MS = 8000;
 const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const UP_TO_DATE_RESET_MS = 5000;
 const AUTO_CHECK_STORAGE_KEY = 'picbed_update_auto_check';
 const LAST_CHECK_STORAGE_KEY = 'picbed_update_last_check_at';
 
 export type UpdateStatus = 'idle' | 'checking' | 'available' | 'downloading' | 'downloaded';
 
 type UpdateRuntime = { os: string; arch: string; portable: boolean; package: string };
-type UpdateLatest = { tag: string; assets: string[] | null };
+type UpdateLatest = { tag: string; assets: string[] | null; notes: string; html_url: string; published_at: string };
 type UpdateProgress = { downloaded: number; total: number };
 type UpdateTask = {
   assetName: string;
@@ -94,16 +95,21 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
   const updateStatus = ref<UpdateStatus>('idle');
   const updateVersion = ref('');
   const updateProgress = ref<UpdateProgress | null>(null);
+  const updateNotes = ref('');
+  const updatePublishedAt = ref('');
+  const lastCheckAt = ref(Number(localStorage.getItem(LAST_CHECK_STORAGE_KEY)) || 0);
+  const showUpToDate = ref(false);
   const autoCheckUpdate = ref(autoCheckStorageEnabled());
   let downloadedPath = '';
   let updateTask: UpdateTask | null = null;
+  let upToDateTimer: number | undefined;
 
   function setAutoCheckUpdate(value: boolean) {
     autoCheckUpdate.value = value;
     localStorage.setItem(AUTO_CHECK_STORAGE_KEY, value ? '1' : '0');
   }
 
-  /// 检查 GitHub 最新版本；manual 为手动点击（结果以提示反馈），启动自动检查静默进行
+  /// 检查 GitHub 最新版本；manual 为手动点击（结果以状态胶囊反馈），启动自动检查静默进行
   async function checkUpdate(manual: boolean) {
     if (updateStatus.value === 'checking' || updateStatus.value === 'downloading') return;
     updateStatus.value = 'checking';
@@ -113,18 +119,31 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
         request<UpdateRuntime>('/api/app/update-runtime'),
         request<UpdateLatest>('/api/app/update-latest'),
       ]);
+      lastCheckAt.value = Date.now();
       localStorage.setItem(LAST_CHECK_STORAGE_KEY, String(Date.now()));
       const version = latest.tag.replace(/^v/, '');
       if (!version || compareVersions(version, current) <= 0) {
         updateStatus.value = 'idle';
         updateVersion.value = '';
         updateTask = null;
-        if (manual) showMessage('当前已是最新版');
+        updateNotes.value = '';
+        updatePublishedAt.value = '';
+        if (manual) {
+          showUpToDate.value = true;
+          if (upToDateTimer !== undefined) window.clearTimeout(upToDateTimer);
+          upToDateTimer = window.setTimeout(() => {
+            upToDateTimer = undefined;
+            showUpToDate.value = false;
+          }, UP_TO_DATE_RESET_MS);
+        }
         return;
       }
       updateVersion.value = version;
+      updateNotes.value = latest.notes;
+      updatePublishedAt.value = latest.published_at;
       updateTask = pickUpdateAsset(latest.assets, version, runtime);
       updateStatus.value = 'available';
+      if (manual) showMessage(`发现新版本 v${version}，可更新到最新版`);
     } catch (error) {
       updateStatus.value = 'idle';
       if (manual) showError(error instanceof Error ? error.message : '检查更新失败');
@@ -201,6 +220,10 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
     updateStatus,
     updateVersion,
     updateProgress,
+    updateNotes,
+    updatePublishedAt,
+    lastCheckAt,
+    showUpToDate,
     autoCheckUpdate,
     setAutoCheckUpdate,
     checkUpdate: () => checkUpdate(true),
@@ -208,4 +231,13 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
     applyUpdate,
     openUpdatePackage,
   };
+}
+
+/// 把时间戳格式化为「X 分钟/小时/天前」的相对时间
+export function relativeTimeText(timestamp: number) {
+  const elapsed = Date.now() - timestamp;
+  if (elapsed < 60 * 1000) return '刚刚';
+  if (elapsed < 60 * 60 * 1000) return `${Math.floor(elapsed / (60 * 1000))} 分钟前`;
+  if (elapsed < 24 * 60 * 60 * 1000) return `${Math.floor(elapsed / (60 * 60 * 1000))} 小时前`;
+  return `${Math.floor(elapsed / (24 * 60 * 60 * 1000))} 天前`;
 }

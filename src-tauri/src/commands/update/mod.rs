@@ -89,13 +89,39 @@ pub(crate) fn is_installed_build() -> bool {
     exe_in_system_dir()
 }
 
-/// NSIS 安装特征：可执行文件同目录存在卸载程序
+/// NSIS 安装特征：同目录存在卸载程序，且注册表卸载项能搜到应用名——
+/// 整体拷走使用的安装版目录有卸载程序但无注册表记录，按便携处理（走自替换而非向系统重装）
 #[cfg(target_os = "windows")]
 fn windows_installed() -> bool {
-    std::env::current_exe()
+    let has_uninstaller = std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|dir| dir.join("uninstall.exe").is_file()))
-        .unwrap_or(false)
+        .unwrap_or(false);
+    has_uninstaller && nsis_registry_record_exists()
+}
+
+/// 注册表卸载项搜索：Tauri NSIS 默认按当前用户安装（HKCU），兼容查 HKLM；查询失败按未安装处理
+#[cfg(target_os = "windows")]
+fn nsis_registry_record_exists() -> bool {
+    use std::os::windows::process::CommandExt;
+
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    const ROOTS: [&str; 2] = [
+        r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall",
+        r"HKLM\Software\Microsoft\Windows\CurrentVersion\Uninstall",
+    ];
+    for root in ROOTS {
+        let hit = std::process::Command::new("reg")
+            .args(["query", root, "/s", "/f", "PicBed Switcher", "/d"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map(|output| output.status.success() && !output.stdout.is_empty())
+            .unwrap_or(false);
+        if hit {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(not(target_os = "windows"))]
