@@ -12,6 +12,7 @@ const {
   secretBackend,
   syncBusy,
   syncConnected,
+  syncTokenInvalid,
   localConfigCount,
   syncStatusBadge,
   remoteVersionBadge,
@@ -178,7 +179,8 @@ function submitUnlock() {
         <span class="sync-row-icon"><Cloud :size="20" /></span>
         <div>
           <strong>GitHub Gist</strong>
-          <span v-if="syncConnected">{{ syncAccount }}（令牌存{{ secretBackend === 'file' ? '加密本机文件' : '系统钥匙串' }}）</span>
+          <span v-if="syncConnected && syncTokenInvalid">令牌已被服务端作废（修改密码 / 撤销授权），请重新连接</span>
+          <span v-else-if="syncConnected">{{ syncAccount }}（令牌存{{ secretBackend === 'file' ? '加密本机文件' : '系统钥匙串' }}）</span>
           <span v-else>未连接 —— 授权后配置将加密存入你的私有 Gist</span>
         </div>
       </div>
@@ -193,6 +195,23 @@ function submitUnlock() {
             <RefreshCw v-if="githubConnectPreparing" :size="17" class="spin-icon" />
             <Cloud v-else :size="17" />连接 GitHub
           </button>
+        </template>
+        <template v-else-if="syncTokenInvalid">
+          <span class="sync-connected-tag invalid">授权已失效</span>
+          <button
+            class="secondary"
+            type="button"
+            :disabled="syncBusy || githubConnectPreparing"
+            @click="openGithubConnect"
+          >
+            <RefreshCw v-if="githubConnectPreparing" :size="17" class="spin-icon" />
+            <Cloud v-else :size="17" />重新连接 GitHub
+          </button>
+          <AppTooltip label="断开连接（清除本地令牌与同步快照）" center>
+            <button class="ghost sync-disconnect" type="button" :disabled="syncBusy" @click="disconnectGithub">
+              <Trash2 :size="17" />断开
+            </button>
+          </AppTooltip>
         </template>
         <template v-else>
           <span class="sync-connected-tag">已连接</span>

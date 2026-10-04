@@ -16,6 +16,7 @@ import DownloadPanel from './components/workspace/DownloadPanel.vue';
 import ConfigsPanel from './components/workspace/ConfigsPanel.vue';
 import RecordsPanel from './components/workspace/RecordsPanel.vue';
 import CloudSyncPanel from './components/workspace/CloudSyncPanel.vue';
+import SyncTokenBanner from './components/workspace/SyncTokenBanner.vue';
 import AboutPanel from './components/workspace/AboutPanel.vue';
 import WorkspaceHeader from './components/workspace/WorkspaceHeader.vue';
 import WorkspaceTabs from './components/workspace/WorkspaceTabs.vue';
@@ -164,6 +165,7 @@ analyzeBatch,
   syncRemoteState,
   syncBusy,
   syncConnected,
+  syncTokenInvalid,
   localConfigCount,
   syncStatusBadge,
   remoteVersionBadge,
@@ -255,7 +257,7 @@ provideWorkspace({
   confirmDeleteConfig, setDefault, handleFiles, handleFileDrop, addPastedDocument, removeBatchFile, localStatusLabel,
   handleLocalDocumentFiles, handleLocalDocumentDrop, handleLocalImageFiles, handleLocalImageDrop, removeLocalDocument, removeLocalImage,
   handleDownloadDocumentFiles, handleDownloadDocumentDrop, removeDownloadDocument, selectDownloadDir, analyzeDownloadDocuments, downloadAllImages,
-  syncAccount, secretBackend, syncPassword, syncPatInput, syncRemoteState, syncBusy, syncConnected, localConfigCount,
+  syncAccount, secretBackend, syncPassword, syncPatInput, syncRemoteState, syncBusy, syncConnected, syncTokenInvalid, localConfigCount,
   syncStatusBadge, remoteVersionBadge, lastSyncText, canSyncNow, syncNow, syncBanner, overrideCloudWithLocal, pushEmptyVaultLocal, resolveConflictWithCloudPassword, restoreRemoteVersion, forcePushLocal,
   passwordStatus, passwordBackend, lockSyncPassword, passwordModalOpen, passwordModalMode, openPasswordModal, closePasswordModal, cloudPwdModalOpen, openCloudPwdModal, closeCloudPwdModal,
   submitPasswordModal, unlockWithPassword, autoSyncDisplayChecked, autoSyncToggleEnabled, autoSyncToggleTitle, setAutoSyncEnabled, githubConnectOpen, githubConnectPreparing, deviceFlowUserCode, deviceFlowStatus, deviceFlowError, deviceFlowAvailable, patMode,
@@ -291,6 +293,7 @@ analyzeBatch, convertBatch, analyzeLocalBatch, uploadLocalBatch, closeGithubProx
       <RecordsPanel v-if="activeTab === 'records'" />
       <CloudSyncPanel v-if="activeTab === 'cloudSync'" />
       <AboutPanel v-if="activeTab === 'about'" />
+      <SyncTokenBanner />
     </section>
     <GithubProxyDialog />
     <TaskProgressDialog />

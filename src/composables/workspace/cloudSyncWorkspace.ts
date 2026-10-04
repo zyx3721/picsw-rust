@@ -172,6 +172,7 @@ export function useWorkspaceCloudSync({
   const autoSyncEnabled = ref(localStorage.getItem(AUTO_SYNC_STORAGE_KEY) !== '0');
   const syncBanner = ref<SyncBanner | null>(null);
   const secretBackend = ref(localStorage.getItem(SECRET_BACKEND_STORAGE_KEY) || '');
+  const syncTokenInvalid = ref(false);
   const initialLastSync = (() => {
     try {
       return JSON.parse(localStorage.getItem(LAST_SYNC_STORAGE_KEY) || '') as { at: number; version: number };
@@ -198,6 +199,7 @@ export function useWorkspaceCloudSync({
     () =>
       autoSyncEnabled.value &&
       syncConnected.value &&
+      !syncTokenInvalid.value &&
       passwordStatus.value === 'unlocked' &&
       !syncBusy.value &&
       !syncBanner.value
@@ -327,9 +329,10 @@ export function useWorkspaceCloudSync({
 
   const syncConnected = computed(() => syncAccount.value.length > 0);
   const localConfigCount = computed(() => configs.value.length);
-  /// 同步状态徽章：同步中 / 冲突 / 阻塞 / 待恢复 / 就绪
+  /// 同步状态徽章：同步中 / 授权失效 / 冲突 / 阻塞 / 待恢复 / 就绪
   const syncStatusBadge = computed<SyncStatusBadge>(() => {
     if (syncBusy.value) return { text: '同步中', kind: 'busy' };
+    if (syncConnected.value && syncTokenInvalid.value) return { text: '授权失效', kind: 'danger' };
     if (syncBanner.value?.kind === 'conflict') return { text: '冲突', kind: 'danger' };
     if (syncBanner.value?.kind === 'blocked') return { text: '已拦截', kind: 'danger' };
     if (syncBanner.value?.kind === 'empty') return { text: '待恢复', kind: 'warn' };
@@ -351,7 +354,7 @@ export function useWorkspaceCloudSync({
     return 'locked';
   });
   const canSyncNow = computed(
-    () => syncConnected.value && passwordStatus.value === 'unlocked' && !syncBusy.value
+    () => syncConnected.value && !syncTokenInvalid.value && passwordStatus.value === 'unlocked' && !syncBusy.value
   );
 
   function unauthorized() {
@@ -377,6 +380,7 @@ export function useWorkspaceCloudSync({
     );
   }
 
+  /// 携带令牌请求 GitHub API：401 视为令牌被服务端作废（区别于网络抖动，重试无用），标记失效并暂停云同步
   async function githubFetch(path: string, init: RequestInit = {}) {
     const response = await fetchWithRetry(path, {
       ...init,
@@ -390,6 +394,10 @@ export function useWorkspaceCloudSync({
     });
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
+      if (response.status === 401) {
+        syncTokenInvalid.value = true;
+        throw new Error('GitHub 令牌已失效（修改密码或撤销授权导致），请在云同步面板重新连接');
+      }
       throw new Error(`GitHub API 请求失败（${response.status}）：${detail.slice(0, 160)}`);
     }
     if (response.status === 204) return null;
@@ -481,6 +489,7 @@ export function useWorkspaceCloudSync({
     localStorage.setItem(ACCOUNT_STORAGE_KEY, displayName);
     secretBackend.value = backend;
     syncAccount.value = displayName;
+    syncTokenInvalid.value = false;
     showMessage(`已连接 GitHub 账号 ${displayName}`);
     await refreshRemoteState();
     if (passwordStatus.value === 'unlocked') void syncNow(true);
@@ -619,6 +628,7 @@ export function useWorkspaceCloudSync({
     localStorage.removeItem(ANCHOR_STORAGE_KEY);
     secretBackend.value = '';
     syncAccount.value = '';
+    syncTokenInvalid.value = false;
     syncRemoteState.value = null;
     syncBanner.value = null;
     lastSyncAt.value = 0;
@@ -756,6 +766,7 @@ export function useWorkspaceCloudSync({
     }
   }
 
+  /// 启动恢复令牌并验证：401 失效态保留凭据与连接展示等待重新授权，其余错误按无法恢复凭据清理
   async function restoreConnection() {
     const backend = localStorage.getItem(SECRET_BACKEND_STORAGE_KEY);
     const legacyCiphertext = localStorage.getItem(TOKEN_STORAGE_KEY);
@@ -783,6 +794,7 @@ export function useWorkspaceCloudSync({
       syncAccount.value = (user.name || '').trim() || user.login || '已连接';
       await refreshRemoteState();
     } catch {
+      if (syncTokenInvalid.value) return;
       cachedToken = '';
       localStorage.removeItem(SECRET_BACKEND_STORAGE_KEY);
       localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -1371,7 +1383,7 @@ export function useWorkspaceCloudSync({
   /// 启动自动同步：连接与解锁就绪后先对齐一次云端（与自动同步开关无关，失败静默不阻塞启动）
   async function startupAutoSync() {
     await Promise.all([restoreConnection(), autoUnlockPassword()]);
-    if (!syncConnected.value || passwordStatus.value !== 'unlocked') return;
+    if (!syncConnected.value || syncTokenInvalid.value || passwordStatus.value !== 'unlocked') return;
     void syncNow(true);
   }
 
@@ -1467,6 +1479,7 @@ export function useWorkspaceCloudSync({
     syncRemoteState,
     syncBusy,
     syncConnected,
+    syncTokenInvalid,
     localConfigCount,
     syncStatusBadge,
     remoteVersionBadge,

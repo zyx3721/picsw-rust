@@ -1132,6 +1132,49 @@ svg {
   font-weight: 800;
   font-size: 12px;
 }
+.sync-connected-tag.invalid {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.sync-token-banner {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(440px, calc(100vw - 40px));
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: left;
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.sync-token-banner:hover {
+  background: var(--surface-muted);
+}
+.sync-token-banner svg {
+  flex-shrink: 0;
+  color: var(--danger);
+}
+.sync-token-banner span {
+  min-width: 0;
+  flex: 1;
+}
+.sync-token-banner em {
+  flex-shrink: 0;
+  color: var(--primary-strong);
+  font-style: normal;
+  font-weight: 800;
+}
 .sync-count-tag {
   color: var(--muted);
   font-weight: 800;
