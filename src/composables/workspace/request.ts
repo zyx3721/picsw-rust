@@ -3,6 +3,9 @@ import type { RequestError } from './types';
 
 type LocalImageUpload = { key: string; name: string; data: string };
 
+/// 更新下载等需要流式回调的路由：经 options.channel 透传 Tauri Channel
+type RequestWithChannel = RequestInit & { channel?: unknown };
+
 function normalizePath(path: string) {
   return path.startsWith('/') ? path : `/${path}`;
 }
@@ -86,9 +89,16 @@ export function createWorkspaceRequest() {
         case 'GET /api/app/update-latest':
           return await invoke<T>('get_update_latest');
         case 'POST /api/app/update/download':
-          return await invoke<T>('download_update', { url: body.url || '', checksumUrl: body.checksum_url || '', assetName: body.asset_name || '' });
+          return await invoke<T>('download_update', {
+            url: body.url || '',
+            checksumUrl: body.checksum_url || '',
+            assetName: body.asset_name || '',
+            onProgress: (options as RequestWithChannel).channel,
+          });
         case 'POST /api/app/update/apply':
           return await invoke<T>('apply_update', { filePath: body.file_path || '' });
+        case 'POST /api/app/update/open':
+          return await invoke<T>('open_update_package', { filePath: body.file_path || '' });
         default:
           break;
       }

@@ -8,11 +8,42 @@ import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 const GITHUB_URL = 'https://github.com/zyx3721/picsw-rust';
 const ISSUES_URL = 'https://github.com/zyx3721/picsw-rust/issues';
 const RELEASES_URL = 'https://github.com/zyx3721/picsw-rust/releases';
-const { showError, updateStatus, updateVersion, checkUpdate, startUpdate } = useWorkspaceContext();
+const {
+  showError,
+  updateStatus,
+  updateVersion,
+  updateProgress,
+  autoCheckUpdate,
+  setAutoCheckUpdate,
+  checkUpdate,
+  startUpdate,
+  applyUpdate,
+  openUpdatePackage,
+} = useWorkspaceContext();
 
 const appVersion = ref('');
 
-const updateBusy = computed(() => updateStatus.value === 'checking' || updateStatus.value === 'downloading');
+const updateBusy = computed(
+  () => updateStatus.value === 'checking' || updateStatus.value === 'downloading'
+);
+
+/// 下载进度百分比与可读字节数（总长未知时只显示已下载量）
+const updateProgressText = computed(() => {
+  const progress = updateProgress.value;
+  if (!progress) return '';
+  const done = formatBytes(progress.downloaded);
+  if (progress.total > 0) {
+    const percent = Math.min(100, Math.floor((progress.downloaded / progress.total) * 100));
+    return `${percent}%（${done} / ${formatBytes(progress.total)}）`;
+  }
+  return `已下载 ${done}`;
+});
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 /// 按钮文案随更新状态机切换，宽度随文本自适应
 const updateButtonText = computed(() => {
@@ -74,11 +105,31 @@ async function openReleases() {
       </div>
       <div class="about-update-area">
         <span v-if="updateStatus === 'available' && updateVersion" class="about-update-tag">检测到新版本： v{{ updateVersion }}</span>
-        <button class="primary about-update-btn" type="button" :disabled="updateBusy" @click="handleUpdateClick">
+        <span v-if="updateStatus === 'downloading'" class="about-update-tag">{{ updateProgressText }}</span>
+        <template v-if="updateStatus === 'downloaded'">
+          <span class="about-update-tag">更新包已就绪</span>
+          <button class="secondary about-update-btn" type="button" @click="openUpdatePackage">打开更新包</button>
+          <button class="primary about-update-btn" type="button" @click="applyUpdate">应用更新</button>
+        </template>
+        <button v-else class="primary about-update-btn" type="button" :disabled="updateBusy" @click="handleUpdateClick">
           <RefreshCw v-if="updateStatus === 'checking' || updateStatus === 'downloading'" :size="17" class="spin-icon" />
           <Download v-else :size="17" />{{ updateButtonText }}
         </button>
       </div>
+    </div>
+
+    <div class="about-row">
+      <div class="about-row-main">
+        <span class="about-row-icon"><RefreshCw :size="20" /></span>
+        <div class="about-row-info">
+          <strong>自动检查更新</strong>
+          <span>启动后静默检查新版本（每 24 小时一次），可随时手动检查</span>
+        </div>
+      </div>
+      <label class="sync-toggle">
+        <input type="checkbox" :checked="autoCheckUpdate" @change="setAutoCheckUpdate(($event.target as HTMLInputElement).checked)" />
+        <span class="sync-toggle-track" aria-hidden="true"></span>
+      </label>
     </div>
 
     <div class="about-row">

@@ -274,7 +274,17 @@ export function usePicbedWorkspace() {
     reloadConfigs: () => loadConfigs(),
   });
 
-  const { updateStatus, updateVersion, checkUpdate, startUpdate } = createUpdateChecker({
+  const {
+    updateStatus,
+    updateVersion,
+    updateProgress,
+    autoCheckUpdate,
+    setAutoCheckUpdate,
+    checkUpdate,
+    startUpdate,
+    applyUpdate,
+    openUpdatePackage,
+  } = createUpdateChecker({
     request,
     showMessage,
     showError,
@@ -450,8 +460,13 @@ export function usePicbedWorkspace() {
     restoreRevision,
     updateStatus,
     updateVersion,
+    updateProgress,
+    autoCheckUpdate,
+    setAutoCheckUpdate,
     checkUpdate,
     startUpdate,
+    applyUpdate,
+    openUpdatePackage,
     secretVisibility,
     isAuthed,
     supportedTypes,

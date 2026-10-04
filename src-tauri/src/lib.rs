@@ -118,9 +118,10 @@ pub fn run() {
             commands::github_sync::github_device_flow_poll,
             commands::github_sync::sync_github_client_id,
             commands::update::get_update_runtime,
-            commands::update::get_update_latest,
-            commands::update::download_update,
-            commands::update::apply_update,
+            commands::update::fetch::get_update_latest,
+            commands::update::download::download_update,
+            commands::update::install::apply_update,
+            commands::update::install::open_update_package,
             commands::window::exit_app,
             commands::window::hide_main_window,
         ])
