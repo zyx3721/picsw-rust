@@ -3,7 +3,7 @@ import { computed, ref } from 'vue';
 
 type TooltipPlacement = 'top' | 'bottom';
 
-const props = defineProps<{ label?: string; wrap?: boolean; center?: boolean }>();
+const props = defineProps<{ label?: string; wrap?: boolean; center?: boolean; pre?: boolean }>();
 const triggerRef = ref<HTMLElement | null>(null);
 const tooltip = ref({ open: false, top: 0, left: 0, placement: 'top' as TooltipPlacement });
 
@@ -50,7 +50,7 @@ function hideTooltip() {
       <span
         v-if="tooltip.open"
         class="app-tooltip-bubble"
-        :class="{ wrap: props.wrap, center: props.center }"
+        :class="{ wrap: props.wrap, center: props.center, pre: props.pre }"
         :style="bubbleStyle"
         >{{ label }}</span
       >

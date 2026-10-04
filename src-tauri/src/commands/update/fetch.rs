@@ -104,10 +104,40 @@ async fn fetch_release_api() -> Result<UpdateLatest, String> {
     Ok(UpdateLatest {
         tag,
         assets,
-        notes: release.body.unwrap_or_default(),
+        notes: extract_release_digest(&release.body.unwrap_or_default()),
         html_url: release.html_url.unwrap_or_default(),
         published_at: release.published_at.unwrap_or_default(),
     })
+}
+
+/// 提取 release 正文前两个 `###` 章节（构建信息与更新内容），清洗 markdown 标记为可读纯文本；
+/// 无章节结构时清洗全文兜底
+fn extract_release_digest(body: &str) -> String {
+    let lines: Vec<&str> = body.lines().collect();
+    let section_heads: Vec<usize> = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| line.trim_start().starts_with("### "))
+        .map(|(index, _)| index)
+        .collect();
+    let slice = match section_heads.len() {
+        0 => &lines[..],
+        1 => &lines[section_heads[0]..],
+        _ => &lines[section_heads[0]..section_heads[2]],
+    };
+    clean_markdown(&slice.join("\n"))
+}
+
+/// 清洗 markdown 标记：去标题井号、加粗星号与行内代码反引号，保留行结构与换行
+fn clean_markdown(text: &str) -> String {
+    text.lines()
+        .map(|line| {
+            let trimmed = line.trim_start();
+            let stripped = trimmed.strip_prefix("### ").unwrap_or(trimmed);
+            stripped.replace("**", "").replace('`', "")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// 经发布页 302 跳转地址解析最新版本号（无资产清单与发布信息）
@@ -141,4 +171,31 @@ fn update_http_client(redirect: reqwest::redirect::Policy) -> Result<reqwest::Cl
         .redirect(redirect)
         .build()
         .map_err(|e| format!("创建网络客户端失败: {e}"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn release_digest_keeps_first_two_sections_and_cleans_markdown() {
+        let body = "## 🎉 PicBed Switcher Desktop v1.2.0 发布\n\n### 📋 构建信息\n- **版本**: v1.2.0\n- **Commit**: `e01a53d`\n\n### 📝 更新内容\n- feat: 某功能 (ab12cd3)\n\n### 📦 安装包下载\n- Windows AMD64: `setup.exe`\n";
+        let digest = extract_release_digest(body);
+        assert!(digest.starts_with("📋 构建信息"));
+        assert!(digest.contains("版本: v1.2.0"));
+        assert!(digest.contains("Commit: e01a53d"));
+        assert!(digest.contains("📝 更新内容"));
+        assert!(digest.contains("- feat: 某功能 (ab12cd3)"));
+        assert!(!digest.contains("###"));
+        assert!(!digest.contains("**"));
+        assert!(!digest.contains('`'));
+        assert!(!digest.contains("安装包下载"));
+        assert!(!digest.contains("🎉"));
+    }
+
+    #[test]
+    fn release_digest_falls_back_to_full_body_without_sections() {
+        let digest = extract_release_digest("- **版本**: v1.0.0");
+        assert_eq!(digest, "- 版本: v1.0.0");
+    }
 }

@@ -5,6 +5,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import { relativeTimeText } from '../../composables/workspace/updateChecker';
+import AppTooltip from '../AppTooltip.vue';
 
 const GITHUB_URL = 'https://github.com/zyx3721/picsw-rust';
 const ISSUES_URL = 'https://github.com/zyx3721/picsw-rust/issues';
@@ -15,7 +16,6 @@ const {
   updateVersion,
   updateProgress,
   updateNotes,
-  updatePublishedAt,
   lastCheckAt,
   showUpToDate,
   autoCheckUpdate,
@@ -42,17 +42,6 @@ const updateProgressText = computed(() => {
     return `${percent}%（${done} / ${formatBytes(progress.total)}）`;
   }
   return `已下载 ${done}`;
-});
-
-/// 新版本提示条的悬浮说明：release notes 原文 + 发布时间（302 回退通道无这些信息时省略）
-const updateNotesTitle = computed(() => {
-  const parts: string[] = [];
-  if (updateNotes.value) parts.push(updateNotes.value);
-  if (updatePublishedAt.value) {
-    const date = new Date(updatePublishedAt.value);
-    if (!Number.isNaN(date.getTime())) parts.push(`发布时间：${date.toLocaleString()}`);
-  }
-  return parts.join('\n\n');
 });
 
 /// 自动检查开关行的描述：有检查记录时附上次检查时间
@@ -127,11 +116,9 @@ async function openReleases() {
       </div>
       <div class="about-update-area">
         <span v-if="showUpToDate" class="about-update-tag">已是最新版</span>
-        <span
-          v-if="updateStatus === 'available' && updateVersion"
-          class="about-update-tag"
-          :title="updateNotesTitle"
-        >检测到新版本： v{{ updateVersion }}</span>
+        <AppTooltip v-if="updateStatus === 'available' && updateVersion" :label="updateNotes" pre>
+          <span class="about-update-tag">检测到新版本： v{{ updateVersion }}</span>
+        </AppTooltip>
         <span v-if="updateStatus === 'downloading'" class="about-update-tag">{{ updateProgressText }}</span>
         <template v-if="updateStatus === 'downloaded'">
           <span class="about-update-tag">更新包已就绪</span>

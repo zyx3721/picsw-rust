@@ -96,7 +96,6 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
   const updateVersion = ref('');
   const updateProgress = ref<UpdateProgress | null>(null);
   const updateNotes = ref('');
-  const updatePublishedAt = ref('');
   const lastCheckAt = ref(Number(localStorage.getItem(LAST_CHECK_STORAGE_KEY)) || 0);
   const showUpToDate = ref(false);
   const autoCheckUpdate = ref(autoCheckStorageEnabled());
@@ -127,7 +126,6 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
         updateVersion.value = '';
         updateTask = null;
         updateNotes.value = '';
-        updatePublishedAt.value = '';
         if (manual) {
           showUpToDate.value = true;
           if (upToDateTimer !== undefined) window.clearTimeout(upToDateTimer);
@@ -140,7 +138,6 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
       }
       updateVersion.value = version;
       updateNotes.value = latest.notes;
-      updatePublishedAt.value = latest.published_at;
       updateTask = pickUpdateAsset(latest.assets, version, runtime);
       updateStatus.value = 'available';
       if (manual) showMessage(`发现新版本 v${version}，可更新到最新版`);
@@ -221,7 +218,6 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
     updateVersion,
     updateProgress,
     updateNotes,
-    updatePublishedAt,
     lastCheckAt,
     showUpToDate,
     autoCheckUpdate,

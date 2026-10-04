@@ -2808,6 +2808,9 @@ th {
 .app-tooltip-bubble.wrap {
   max-width: min(640px, calc(100vw - 24px));
 }
+.app-tooltip-bubble.pre {
+  white-space: pre-wrap;
+}
 .app-tooltip-bubble.center {
   max-width: none;
   white-space: nowrap;
