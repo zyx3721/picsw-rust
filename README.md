@@ -223,6 +223,16 @@ npm run tauri build
 
 图床配置的加密方式与 Web 版一致，但存储位置不同（Web 版在 PostgreSQL，桌面版在 SQLite），暂不提供直接迁移工具；桌面版重新添加一次图床配置即可。
 
+**macOS 上提示「已损坏，无法打开」怎么办？**
+
+这是 macOS Gatekeeper 对未签名应用的拦截提示，并非安装包真的损坏（应用尚未进行 Apple 开发者签名与公证）。在终端执行以下命令移除隔离属性，之后即可正常打开：
+
+```bash
+sudo xattr -rd com.apple.quarantine "/Applications/PicBed Switcher.app"
+```
+
+该问题在 Apple Silicon 芯片的 Mac 上尤为常见；便携版 tar.gz 解压后一般不会出现此提示。
+
 ## 项目结构
 
 ```text

@@ -128,7 +128,7 @@ jobs:
             cp -R "${APP_DIR}" "${PORTABLE_DIR}/"
             hdiutil detach "${MNT_DIR}" >/dev/null
             rm -f "${PORTABLE_DIR}/picbed-switcher"
-            printf '解压后将 "PicBed Switcher.app" 拖入「应用程序」目录即可使用；首次打开如提示无法验证开发者，请在「系统设置 → 隐私与安全性」中允许。\n' > "${PORTABLE_DIR}/README.txt"
+            printf '解压后将 "PicBed Switcher.app" 拖入「应用程序」目录即可使用；首次打开如提示「已损坏，无法打开」，请在终端执行 sudo xattr -rd com.apple.quarantine "/Applications/PicBed Switcher.app" 移除隔离属性后再打开。\n' > "${PORTABLE_DIR}/README.txt"
             tar -czf "release-assets/picbed-switcher_${VERSION}_${PORTABLE_OS}_${PORTABLE_ARCH}.tar.gz" -C "${PORTABLE_DIR}" .
           elif [ "${PORTABLE_OS}" = "windows" ]; then
             printf '解压后将 picbed-switcher.exe 放到任意目录运行；需要系统已安装 WebView2 运行时（Windows 10/11 一般自带）。\r\n' > "${PORTABLE_DIR}/README.txt"

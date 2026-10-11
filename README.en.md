@@ -225,6 +225,16 @@ Relative paths (`./images/a.png`, `images/a.png`), Windows absolute paths and `<
 
 Host configurations use the same encryption as the web edition, but storage differs (PostgreSQL there, SQLite here); there is no direct migration tool yet — simply re-add your host configurations in the desktop app.
 
+**macOS reports the app as damaged and can't be opened — what should I do?**
+
+This is macOS Gatekeeper blocking an unsigned app, not actual corruption (the app is not yet signed and notarized with an Apple Developer certificate). Run the following command in Terminal to remove the quarantine attribute, then open the app normally:
+
+```bash
+sudo xattr -rd com.apple.quarantine "/Applications/PicBed Switcher.app"
+```
+
+This is especially common on Apple silicon Macs; the portable tar.gz archives usually do not trigger this prompt.
+
 ## Repository Layout
 
 ```text
