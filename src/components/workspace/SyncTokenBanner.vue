@@ -13,7 +13,7 @@ const { activeTab, syncConnected, syncTokenInvalid, setActiveTab } = useWorkspac
   @click="setActiveTab('cloudSync')"
 >
   <AlertTriangle :size="16" />
-  <span>GitHub 授权已失效，云同步已暂停 —— 点击重新连接（数据不会丢失）</span>
+  <span>GitHub 授权已失效，云同步已暂停 —— 点击处理（可先重新验证，数据不会丢失）</span>
   <em>去处理</em>
 </button>
 </template>

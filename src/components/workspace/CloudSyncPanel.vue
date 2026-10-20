@@ -33,6 +33,7 @@ const {
   openCloudPwdModal,
   unlockWithPassword,
   openGithubConnect,
+  revalidateConnection,
   githubConnectPreparing,
   autoSyncDisplayChecked,
   autoSyncToggleEnabled,
@@ -179,7 +180,7 @@ function submitUnlock() {
         <span class="sync-row-icon"><Cloud :size="20" /></span>
         <div>
           <strong>GitHub Gist</strong>
-          <span v-if="syncConnected && syncTokenInvalid">令牌已被服务端作废（修改密码 / 撤销授权），请重新连接</span>
+          <span v-if="syncConnected && syncTokenInvalid">授权已过期或被撤销，请重新连接；若只是网络波动，可先点「重新验证」</span>
           <span v-else-if="syncConnected">{{ syncAccount }}（令牌存{{ secretBackend === 'file' ? '加密本机文件' : '系统钥匙串' }}）</span>
           <span v-else>未连接 —— 授权后配置将加密存入你的私有 Gist</span>
         </div>
@@ -198,6 +199,16 @@ function submitUnlock() {
         </template>
         <template v-else-if="syncTokenInvalid">
           <span class="sync-connected-tag invalid">授权已失效</span>
+          <AppTooltip label="用本机保存的令牌重新校验 GitHub 授权" center>
+            <button
+              class="secondary"
+              type="button"
+              :disabled="syncBusy"
+              @click="revalidateConnection"
+            >
+              <KeyRound :size="17" />重新验证
+            </button>
+          </AppTooltip>
           <button
             class="secondary"
             type="button"

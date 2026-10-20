@@ -380,8 +380,11 @@ export function useWorkspaceCloudSync({
     );
   }
 
-  /// 携带令牌请求 GitHub API：401 视为令牌被服务端作废（区别于网络抖动，重试无用），标记失效并暂停云同步
+  /// 携带令牌请求 GitHub API：401 视为令牌过期或被撤销（区别于网络抖动，重试无用），标记失效并暂停云同步
   async function githubFetch(path: string, init: RequestInit = {}) {
+    if (!cachedToken) {
+      throw new Error('尚未连接 GitHub，请先完成授权');
+    }
     const response = await fetchWithRetry(path, {
       ...init,
       headers: {
@@ -396,7 +399,7 @@ export function useWorkspaceCloudSync({
       const detail = await response.text().catch(() => '');
       if (response.status === 401) {
         syncTokenInvalid.value = true;
-        throw new Error('GitHub 令牌已失效（修改密码或撤销授权导致），请在云同步面板重新连接');
+        throw new Error('GitHub 授权已过期或被撤销，请点「重新验证」重试，或重新连接 GitHub');
       }
       throw new Error(`GitHub API 请求失败（${response.status}）：${detail.slice(0, 160)}`);
     }
@@ -766,39 +769,90 @@ export function useWorkspaceCloudSync({
     }
   }
 
-  /// 启动恢复令牌并验证：401 失效态保留凭据与连接展示等待重新授权，其余错误按无法恢复凭据清理
+  /// 清空本机连接展示与凭据指针：令牌确实不存在时消除「已连接」假象，同步快照保留供重连后对齐
+  function dropLocalConnection() {
+    cachedToken = '';
+    localStorage.removeItem(SECRET_BACKEND_STORAGE_KEY);
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(ACCOUNT_STORAGE_KEY);
+    secretBackend.value = '';
+    syncAccount.value = '';
+    syncTokenInvalid.value = false;
+    syncRemoteState.value = null;
+    syncBanner.value = null;
+  }
+
+  /// 启动恢复令牌并验证：凭据缺失时清连接展示，网络或服务端错误保留凭据等待重试，
+  /// 401 保留凭据供「重新验证」；旧版密文迁移失败时保留原密文，本会话仍使用内存令牌
   async function restoreConnection() {
     const backend = localStorage.getItem(SECRET_BACKEND_STORAGE_KEY);
     const legacyCiphertext = localStorage.getItem(TOKEN_STORAGE_KEY);
-    if (!backend && !legacyCiphertext) return;
+    if (!backend && !legacyCiphertext) {
+      dropLocalConnection();
+      return;
+    }
+    let token = '';
     try {
-      let token = '';
       if (backend) {
         token = (await invoke<string | null>('sync_load_credential', { backend })) || '';
-        secretBackend.value = backend;
       } else if (legacyCiphertext) {
-        // 旧版本遗留在 WebView 本地存储的固定种子密文：迁移到系统钥匙串后清除
         token = await invoke<string>('sync_load_legacy_credential', { ciphertext: legacyCiphertext });
+      }
+    } catch {
+      return;
+    }
+    if (!token) {
+      dropLocalConnection();
+      return;
+    }
+    if (backend) {
+      secretBackend.value = backend;
+    } else {
+      try {
         const savedBackend = await invoke<string>('sync_save_credential', { plaintext: token });
         localStorage.setItem(SECRET_BACKEND_STORAGE_KEY, savedBackend);
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         secretBackend.value = savedBackend;
+      } catch {
+        secretBackend.value = '';
       }
-      if (!token) {
-        localStorage.removeItem(SECRET_BACKEND_STORAGE_KEY);
-        localStorage.removeItem(TOKEN_STORAGE_KEY);
-        return;
-      }
-      cachedToken = token;
+    }
+    cachedToken = token;
+    try {
       const user = (await githubFetch('/user')) as { login?: string; name?: string | null };
       syncAccount.value = (user.name || '').trim() || user.login || '已连接';
-      await refreshRemoteState();
+      localStorage.setItem(ACCOUNT_STORAGE_KEY, syncAccount.value);
     } catch {
-      if (syncTokenInvalid.value) return;
-      cachedToken = '';
-      localStorage.removeItem(SECRET_BACKEND_STORAGE_KEY);
-      localStorage.removeItem(TOKEN_STORAGE_KEY);
+      return;
     }
+    await refreshRemoteState();
+  }
+
+  /// 手动重新验证本机令牌：成功即清除失效标记并恢复云同步，失败按令牌与网络原因分别提示
+  async function revalidateConnection() {
+    if (syncBusy.value) return;
+    if (!cachedToken) await restoreConnection();
+    if (!cachedToken) {
+      showError('本机没有可用的 GitHub 令牌，请重新连接');
+      return;
+    }
+    loadingStart();
+    let verified = false;
+    try {
+      const user = (await githubFetch('/user')) as { login?: string; name?: string | null };
+      syncAccount.value = (user.name || '').trim() || user.login || syncAccount.value || '已连接';
+      localStorage.setItem(ACCOUNT_STORAGE_KEY, syncAccount.value);
+      syncTokenInvalid.value = false;
+      verified = true;
+    } catch (error) {
+      showError(error instanceof Error ? error.message : '重新验证失败');
+    } finally {
+      loadingEnd();
+    }
+    if (!verified) return;
+    await refreshRemoteState();
+    showMessage('GitHub 授权有效，云同步已恢复');
+    if (passwordStatus.value === 'unlocked') void syncNow(true);
   }
 
   function fingerprintOf(items: RemoteConfigPreview[]) {
@@ -887,6 +941,10 @@ export function useWorkspaceCloudSync({
   /// 按存储顺序序列化，会因顺序不同把「内容一致」误判为「本地有改动」而多推版本。
   async function syncNow(quiet = false) {
     if (!canSyncNow.value) return;
+    if (unauthorized()) {
+      if (!quiet) showError('本机 GitHub 令牌不可用，请重新连接或点「重新验证」');
+      return;
+    }
     loadingStart();
     try {
       const gist = await findSyncGist();
@@ -1517,6 +1575,7 @@ export function useWorkspaceCloudSync({
     autoSyncToggleTitle,
     setAutoSyncEnabled,
     openGithubConnect,
+    revalidateConnection,
     cancelGithubConnect,
     openVerificationPage,
     copyUserCode,
