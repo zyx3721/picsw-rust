@@ -154,7 +154,15 @@ jobs:
         shell: bash
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges -10)
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
+          if [[ -n "${PREV_TAG}" ]]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..HEAD^")
+          else
+            COMMITS=$(git log --pretty=format:"- %s (%h)" HEAD^)
+          fi
+          if [[ -z "${COMMITS}" ]]; then
+            COMMITS="- 与上一版本相比无新增提交"
+          fi
           if [[ "$VERSION" =~ (alpha|beta|rc|pre) ]]; then
             IS_PRERELEASE="true"
             echo "📦 检测到预发布版本: v${VERSION}"
