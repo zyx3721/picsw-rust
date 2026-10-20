@@ -289,6 +289,7 @@ picsw-rust/
 | v1.1.1 | 2026-09-30 | [verchanglog/v1.1.1.md](verchanglog/v1.1.1.md) |
 | v1.2.0 | 2026-09-30 | [verchanglog/v1.2.0.md](verchanglog/v1.2.0.md) |
 | v1.2.1 | 2026-10-05 | [verchanglog/v1.2.1.md](verchanglog/v1.2.1.md) |
+| v1.2.2 | 2026-10-20 | [verchanglog/v1.2.2.md](verchanglog/v1.2.2.md) |
 
 Build artifacts and release notes for each version are available on the [GitHub Releases](https://github.com/zyx3721/picsw-rust/releases) page.
 
