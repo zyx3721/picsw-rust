@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import { Bug, Code2, Download, ExternalLink, FileText, Package, RefreshCw } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
+import { Bug, ChevronDown, Code2, Download, ExternalLink, FileText, LogOut, Package, RefreshCw } from 'lucide-vue-next';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getVersion } from '@tauri-apps/api/app';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import type { CloseAction } from '../../composables/workspace/closeBehavior';
 import { relativeTimeText } from '../../composables/workspace/updateChecker';
 import AppTooltip from '../AppTooltip.vue';
 
 const GITHUB_URL = 'https://github.com/zyx3721/picsw-rust';
 const ISSUES_URL = 'https://github.com/zyx3721/picsw-rust/issues';
 const RELEASES_URL = 'https://github.com/zyx3721/picsw-rust/releases';
+const CLOSE_ACTION_OPTIONS: { value: CloseAction; label: string }[] = [
+  { value: 'ask', label: '每次询问' },
+  { value: 'tray', label: '最小化到托盘' },
+  { value: 'quit', label: '退出应用' },
+];
 const {
   showError,
   updateStatus,
@@ -24,9 +30,12 @@ const {
   startUpdate,
   applyUpdate,
   openUpdatePackage,
+  closeAction,
+  setCloseAction,
 } = useWorkspaceContext();
 
 const appVersion = ref('');
+const closeActionOpen = ref(false);
 
 const updateBusy = computed(
   () => updateStatus.value === 'checking' || updateStatus.value === 'downloading'
@@ -49,6 +58,29 @@ const autoCheckDescription = computed(() => {
   const base = '启动后静默检查新版本（每 24 小时一次），可随时手动检查';
   return lastCheckAt.value > 0 ? `上次检查：${relativeTimeText(lastCheckAt.value)}；${base}` : base;
 });
+
+/// 下拉框展示当前关闭行为文案
+const closeActionLabel = computed(
+  () => CLOSE_ACTION_OPTIONS.find(option => option.value === closeAction.value)?.label ?? '每次询问'
+);
+
+function toggleCloseActionMenu() {
+  closeActionOpen.value = !closeActionOpen.value;
+}
+
+function chooseCloseAction(value: CloseAction) {
+  setCloseAction(value);
+  closeActionOpen.value = false;
+}
+
+function closeCloseActionMenu(event: PointerEvent) {
+  const target = event.target;
+  if (target instanceof Element && target.closest('.about-close-select')) return;
+  closeActionOpen.value = false;
+}
+
+onMounted(() => document.addEventListener('pointerdown', closeCloseActionMenu));
+onBeforeUnmount(() => document.removeEventListener('pointerdown', closeCloseActionMenu));
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -144,6 +176,32 @@ async function openReleases() {
         <input type="checkbox" :checked="autoCheckUpdate" @change="setAutoCheckUpdate(($event.target as HTMLInputElement).checked)" />
         <span class="sync-toggle-track" aria-hidden="true"></span>
       </label>
+    </div>
+
+    <div class="about-row">
+      <div class="about-row-main">
+        <span class="about-row-icon"><LogOut :size="20" /></span>
+        <div class="about-row-info">
+          <strong>关闭窗口时</strong>
+          <span>每次询问为首次关闭时弹窗；最小化后应用在后台运行，转换任务不受影响，可从系统托盘恢复窗口或退出</span>
+        </div>
+      </div>
+      <div class="custom-select about-close-select" :class="{ open: closeActionOpen }">
+        <button class="select-trigger" type="button" :aria-expanded="closeActionOpen" @click="toggleCloseActionMenu">
+          <span>{{ closeActionLabel }}</span>
+          <ChevronDown :size="18" class="select-chevron" />
+        </button>
+        <div v-if="closeActionOpen" class="select-menu">
+          <button
+            v-for="option in CLOSE_ACTION_OPTIONS"
+            :key="option.value"
+            class="select-option"
+            :class="{ selected: option.value === closeAction }"
+            type="button"
+            @click="chooseCloseAction(option.value)"
+          >{{ option.label }}</button>
+        </div>
+      </div>
     </div>
 
     <div class="about-row">

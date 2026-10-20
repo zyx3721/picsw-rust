@@ -20,6 +20,7 @@ import SyncTokenBanner from './components/workspace/SyncTokenBanner.vue';
 import AboutPanel from './components/workspace/AboutPanel.vue';
 import WorkspaceHeader from './components/workspace/WorkspaceHeader.vue';
 import WorkspaceTabs from './components/workspace/WorkspaceTabs.vue';
+import type { CloseAction } from './composables/workspace/closeBehavior';
 
 const closeConfirmOpen = ref(false);
 let unlistenCloseRequested: (() => void) | undefined;
@@ -41,6 +42,14 @@ onMounted(() => {
 onMounted(async () => {
   unlistenCloseRequested = await getCurrentWindow().onCloseRequested(event => {
     event.preventDefault();
+    if (closeAction.value === 'tray') {
+      void invoke('hide_main_window');
+      return;
+    }
+    if (closeAction.value === 'quit') {
+      void invoke('exit_app');
+      return;
+    }
     closeConfirmOpen.value = true;
   });
 });
@@ -49,11 +58,14 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', applyWorkspaceScale);
 });
 
-function exitApp() {
-  void invoke('exit_app');
-}
-function hideToTray() {
+/// 关闭弹窗的选择：勾选「记住我的选择」时写入设置，之后同类关闭不再询问
+function applyCloseDecision(action: Exclude<CloseAction, 'ask'>, remember: boolean) {
   closeConfirmOpen.value = false;
+  if (remember) setCloseAction(action);
+  if (action === 'quit') {
+    void invoke('exit_app');
+    return;
+  }
   void invoke('hide_main_window');
 }
 
@@ -232,6 +244,8 @@ analyzeBatch,
   startUpdate,
   applyUpdate,
   openUpdatePackage,
+  closeAction,
+  setCloseAction,
   closeGithubProxyDialog,
   confirmGithubProxyConvert,
   togglePreview,
@@ -272,7 +286,7 @@ provideWorkspace({
   submitPasswordModal, unlockWithPassword, autoSyncDisplayChecked, autoSyncToggleEnabled, autoSyncToggleTitle, setAutoSyncEnabled, githubConnectOpen, githubConnectPreparing, deviceFlowUserCode, deviceFlowStatus, deviceFlowError, deviceFlowAvailable, patMode,
   autoSyncEnabled, openGithubConnect, revalidateConnection, cancelGithubConnect, openVerificationPage, copyUserCode, connectGithub, disconnectGithub,
   syncHistoryOpen, syncHistoryLoading, syncHistory, selectedRevisionSha, revisionPreview, revisionPreviewLoading, revisionError, restoringRevision,
-  toggleSyncHistory, selectRevision, restoreRevision, updateStatus, updateVersion, updateProgress, updateNotes, lastCheckAt, showUpToDate, autoCheckUpdate, setAutoCheckUpdate, checkUpdate, startUpdate, applyUpdate, openUpdatePackage,
+  toggleSyncHistory, selectRevision, restoreRevision, updateStatus, updateVersion, updateProgress, updateNotes, lastCheckAt, showUpToDate, autoCheckUpdate, setAutoCheckUpdate, checkUpdate, startUpdate, applyUpdate, openUpdatePackage, closeAction, setCloseAction,
 analyzeBatch, convertBatch, analyzeLocalBatch, uploadLocalBatch, closeGithubProxyDialog, confirmGithubProxyConvert,
   togglePreview, changedLines, downloadFile, downloadAll, downloadLocalFile, downloadAllLocalFiles, loadRecords,
   openRecordDetail, closeRecordDetail, deleteRecords, resetLocalUploadForm, clearWorkspaceDrafts,
@@ -308,8 +322,7 @@ analyzeBatch, convertBatch, analyzeLocalBatch, uploadLocalBatch, closeGithubProx
     <TaskProgressDialog />
     <CloseConfirmDialog
       :open="closeConfirmOpen"
-      @confirm-exit="exitApp"
-      @hide-to-tray="hideToTray"
+      @decide="applyCloseDecision"
       @cancel="closeConfirmOpen = false"
     />
     <DeleteConfigDialog />

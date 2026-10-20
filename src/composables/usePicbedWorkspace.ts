@@ -1,4 +1,5 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { createCloseBehavior } from './workspace/closeBehavior';
 import { useWorkspaceConfigActions } from './workspace/configActions';
 import { useWorkspaceConfigForm } from './workspace/configForm';
 import { useWorkspaceCloudSync } from './workspace/cloudSyncWorkspace';
@@ -294,6 +295,8 @@ export function usePicbedWorkspace() {
     showError,
   });
 
+  const { closeAction, setCloseAction } = createCloseBehavior();
+
   function clearWorkspaceDrafts() {
     resetConfigForm();
     resetConvertForm();
@@ -475,6 +478,8 @@ export function usePicbedWorkspace() {
     startUpdate,
     applyUpdate,
     openUpdatePackage,
+    closeAction,
+    setCloseAction,
     secretVisibility,
     isAuthed,
     supportedTypes,
