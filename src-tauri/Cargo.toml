@@ -1,6 +1,6 @@
 [package]
 name = "picsw-rust"
-version = "1.2.3"
+version = "1.2.4"
 description = "图床转站助手 - Markdown 图床地址批量转换桌面端"
 authors = ["Jerion"]
 edition = "2021"
