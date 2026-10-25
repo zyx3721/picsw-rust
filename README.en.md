@@ -57,6 +57,7 @@ Your documents, conversion history and image-host credentials stay on your own d
 - **Image download** — Upload a Markdown containing remote images: all URLs are detected, labeled by host type, and can be batch-downloaded to a directory of your choice; duplicate names get a numeric suffix instead of overwriting.
 - **Cloud sync** — Connect a private GitHub Gist and back up all image-host configurations encrypted with your sync password: changes auto-upload after 3 seconds, manual sync anytime, and Gist revisions can be browsed, previewed and restored in one click; after an app restart the remembered password unlocks automatically and syncs the cloud once, and on another device you connect and unlock with the same password to align. Only ciphertext ever reaches the cloud (zero-knowledge). If the token expires or is revoked, the app clearly flags the authorization as invalid; you can re-validate the stored token first and reconnect from any tab only when needed, keeping your data and sync password intact.
 - **About page** — Card-based view of the app version with project, issue-feedback and release-notes entries, with one-click access to the repository; includes a built-in update checker that runs silently on startup (throttled to once per 24 hours, can be turned off in-page) and installs new versions in-app with one click: real-time download progress with SHA-256 verification, then platform-aware installation — Windows installer silent install and portable self-replacement, Linux deb/rpm privileged install and portable replacement, macOS dmg mount-and-replace of the `.app` bundle and portable replacement. If any step fails, you can retry or open the downloaded package for a manual install. A "When closing the window" row chooses the close behavior (ask each time / minimize to tray / quit), and the remember-my-choice checkbox in the close dialog writes to that same setting.
+- **Light & dark theme** — Toggle between light and dark themes with the top-right button; the icon follows the current theme and the preference is remembered across launches. The light theme keeps the classic look, while the dark theme covers every tab, dialog, table and tooltip.
 - **Single instance** — Launching the app again while it is already running silently exits the second instance — no window, no focus stealing.
 - **GitHub acceleration** — Optionally download GitHub images through gh-proxy-style mirrors for better batch success rates.
 
@@ -257,7 +258,7 @@ picsw-rust/
 │   └── Cargo.toml
 ├── src/                      Vue 3 frontend
 │   ├── components/           Workspace panels & dialogs
-│   ├── composables/          State orchestration
+│   ├── composables/          State orchestration (incl. useTheme for light/dark theme)
 │   │   └── workspace/        Convert / local upload / configs modules (request.ts is the IPC layer)
 │   ├── App.vue               Root component
 │   ├── main.ts               Frontend entry
