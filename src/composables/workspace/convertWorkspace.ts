@@ -4,6 +4,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import { isGithubImageURL, normalizeProxyURL, withGithubProxy } from './imageProxy';
 import type { BatchFile, ConversionRecord, ConversionTask, MarkdownImage, PicbedConfig } from './types';
+import { t } from '../../i18n';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const CONVERT_WORKSPACE_STORAGE_KEY = 'picbed_convert_workspace';
@@ -85,10 +86,10 @@ export function useWorkspaceConvert({
   );
 
   function statusLabel(status: BatchFile['status']) {
-    return { ready: '待识别', analyzed: '已识别', success: '已转换', failed: '失败' }[status];
+    return { ready: t('msg.convert.statusReady'), analyzed: t('msg.convert.statusAnalyzed'), success: t('msg.convert.statusConverted'), failed: t('msg.statusFailed') }[status];
   }
   function targetConfigLabel(config?: PicbedConfig) {
-    return config ? `${config.config_name} · ${typeLabel(config.picbed_type)}` : '请选择';
+    return config ? `${config.config_name} · ${typeLabel(config.picbed_type)}` : t('common.pleaseSelect');
   }
   function selectTargetConfig(id: number) {
     convertForm.target_config_id = id;
@@ -144,7 +145,7 @@ export function useWorkspaceConvert({
       current: taskProgressValue(task),
       success: task.success,
       failed: task.failed,
-      message: task.message || '转换任务执行中',
+      message: task.message || t('msg.convert.taskRunning'),
     });
   }
   function applyTaskRecords(data: ConvertTaskData) {
@@ -167,7 +168,7 @@ export function useWorkspaceConvert({
         file.status = 'failed';
         file.convertedContent = '';
         file.changed = 0;
-        file.error = '未找到转换结果';
+        file.error = t('msg.convert.noResult');
         continue;
       }
       file.status = record.status === 'success' ? 'success' : 'failed';
@@ -179,7 +180,7 @@ export function useWorkspaceConvert({
   async function addMarkdownFiles(fileList: FileList | File[]) {
     const files = Array.from(fileList).filter(file => file.name.toLowerCase().endsWith('.md'));
     if (!files.length) {
-      showError('请上传或拖动 .md 文件');
+      showError(t('msg.needMdFiles'));
       return;
     }
     const loaded = await Promise.all(
@@ -197,7 +198,7 @@ export function useWorkspaceConvert({
     );
     batchFiles.value = [...batchFiles.value, ...loaded];
     persistConvertWorkspace();
-    showMessage(`已加入 ${loaded.length} 个 Markdown 文件`);
+    showMessage(t('msg.convert.addedFiles', { count: loaded.length }));
   }
   async function handleFiles(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -210,7 +211,7 @@ export function useWorkspaceConvert({
   }
   function addPastedDocument() {
     if (!pasteForm.content.trim()) {
-      showError('请先粘贴 Markdown 内容');
+      showError(t('msg.convert.needPasteContent'));
       return;
     }
     batchFiles.value.push({
@@ -226,7 +227,7 @@ export function useWorkspaceConvert({
     });
     pasteForm.content = '';
     persistConvertWorkspace();
-    showMessage('已加入粘贴文档');
+    showMessage(t('msg.convert.addedPaste'));
   }
   function removeBatchFile(id: string) {
     batchFiles.value = batchFiles.value.filter(item => item.id !== id);
@@ -242,7 +243,7 @@ export function useWorkspaceConvert({
   }
   async function analyzeBatch() {
     if (!batchFiles.value.length) {
-      showError('请先添加 Markdown 文件');
+      showError(t('msg.convert.needFiles'));
       return;
     }
     loading.value = true;
@@ -255,29 +256,29 @@ export function useWorkspaceConvert({
         file.images = data.images;
         file.status = 'analyzed';
       }
-      showMessage(`已完成识别，共 ${totalImages.value} 个图片地址`);
+      showMessage(t('msg.convert.analyzed', { count: totalImages.value }));
       persistConvertWorkspace();
     } catch (err) {
-      showError(err instanceof Error ? err.message : '批量识别失败');
+      showError(err instanceof Error ? err.message : t('msg.convert.analyzeFailed'));
     } finally {
       loading.value = false;
     }
   }
   async function convertBatch() {
     if (!convertForm.target_config_id) {
-      showError('请先选择目标图床配置');
+      showError(t('msg.needTarget'));
       return;
     }
     if (!batchFiles.value.length) {
-      showError('请先添加 Markdown 文件');
+      showError(t('msg.convert.needFiles'));
       return;
     }
     if (!isBatchAnalyzed.value) {
-      showError('请先点击批量识别');
+      showError(t('msg.convert.needAnalyze'));
       return;
     }
     if (!totalImages.value) {
-      showError('未识别到图片，无需转换');
+      showError(t('msg.convert.noImages'));
       return;
     }
     if (hasGithubImages.value) {
@@ -305,10 +306,10 @@ export function useWorkspaceConvert({
         const finalStatus = data.task.failed > 0 ? 'failed' : 'success';
         finishTaskProgress({
           status: finalStatus,
-          message: data.task.message || `批量转换完成，成功 ${data.task.success} 个，失败 ${data.task.failed} 个`,
-          detail: '可以关闭此窗口并下载已转换的文档。',
+          message: data.task.message || t('msg.convert.taskDone', { success: data.task.success, failed: data.task.failed }),
+          detail: t('msg.convert.taskDoneHint'),
         });
-        showMessage(`批量转换完成，成功 ${convertedCount.value} 个文件`);
+        showMessage(t('msg.convert.batchDone', { count: convertedCount.value }));
         persistConvertWorkspace(0);
         await loadRecords();
         return;
@@ -326,9 +327,9 @@ export function useWorkspaceConvert({
 
     loading.value = true;
     startTaskProgress({
-      title: '批量转换处理中',
-      message: '正在恢复后台任务进度',
-      detail: `已恢复 ${batchFiles.value.length} 个文档，任务会继续同步进度。`,
+      title: t('msg.convert.progressTitle'),
+      message: t('msg.convert.progressRestoring'),
+      detail: t('msg.convert.progressRestored', { count: batchFiles.value.length }),
       total: Math.max(batchFiles.value.length, 1),
     });
     void pollConvertTask(state.activeTaskId, 0)
@@ -337,10 +338,10 @@ export function useWorkspaceConvert({
         persistConvertWorkspace(activeTaskId);
         finishTaskProgress({
           status: 'failed',
-          message: '任务进度同步失败',
-          detail: err instanceof Error ? err.message : '请稍后重试',
+          message: t('msg.convert.progressSyncFailed'),
+          detail: err instanceof Error ? err.message : t('msg.retryHint'),
         });
-        showError(err instanceof Error ? err.message : '任务进度同步失败');
+        showError(err instanceof Error ? err.message : t('msg.convert.progressSyncFailed'));
       })
       .finally(() => {
         loading.value = false;
@@ -351,9 +352,9 @@ export function useWorkspaceConvert({
     loading.value = true;
     githubProxyDialogOpen.value = false;
     startTaskProgress({
-      title: '批量转换处理中',
-      message: '正在创建转换任务',
-      detail: `共 ${batchFiles.value.length} 个文档，${totalImages.value} 个图片地址。`,
+      title: t('msg.convert.progressTitle'),
+      message: t('msg.convert.creating'),
+      detail: t('msg.convert.progressDetail', { documents: batchFiles.value.length, images: totalImages.value }),
       total: batchFiles.value.length,
     });
     try {
@@ -369,16 +370,16 @@ export function useWorkspaceConvert({
       const taskId = created.task.id;
       activeTaskId = taskId;
       persistConvertWorkspace(taskId);
-      updateTaskProgress({ message: created.task.message || '转换任务已加入队列', current: 0, success: 0, failed: 0 });
+      updateTaskProgress({ message: created.task.message || t('msg.convert.taskQueued'), current: 0, success: 0, failed: 0 });
       await pollConvertTask(taskId);
     } catch (err) {
       persistConvertWorkspace(activeTaskId);
       finishTaskProgress({
         status: 'failed',
-        message: activeTaskId ? '任务进度同步失败' : '批量转换失败',
-        detail: err instanceof Error ? err.message : '批量转换失败，请稍后重试',
+        message: activeTaskId ? t('msg.convert.progressSyncFailed') : t('msg.convert.batchFailed'),
+        detail: err instanceof Error ? err.message : t('msg.convert.batchFailedHint'),
       });
-      showError(err instanceof Error ? err.message : '批量转换失败');
+      showError(err instanceof Error ? err.message : t('msg.convert.batchFailed'));
       await loadRecords();
     } finally {
       loading.value = false;
@@ -392,17 +393,17 @@ export function useWorkspaceConvert({
     });
     if (!targetPath) return;
     await invoke('write_text_file', { path: targetPath, content: file.convertedContent });
-    showMessage('转换后的文档已保存');
+    showMessage(t('msg.convert.saved'));
   }
   async function downloadAll() {
     const targets = batchFiles.value.filter(file => file.convertedContent);
     if (!targets.length) return;
-    const directory = await open({ directory: true, title: '选择保存目录', multiple: false });
+    const directory = await open({ directory: true, title: t('msg.chooseSaveDir'), multiple: false });
     if (typeof directory !== 'string' || !directory) return;
     for (const file of targets) {
       await invoke('write_text_file', { path: `${directory}/${file.filename || 'converted.md'}`, content: file.convertedContent });
     }
-    showMessage(`已保存 ${targets.length} 个转换后的文档`);
+    showMessage(t('msg.convert.savedCount', { count: targets.length }));
   }
   function togglePreview(file: BatchFile) {
     file.previewOpen = !file.previewOpen;

@@ -5,6 +5,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { provideWorkspace } from './composables/useWorkspaceContext';
 import { CircleCheck, CircleX, X } from 'lucide-vue-next';
 import { usePicbedWorkspace } from './composables/usePicbedWorkspace';
+import { t } from './i18n';
 import CloseConfirmDialog from './components/dialogs/CloseConfirmDialog.vue';
 import DeleteConfigDialog from './components/dialogs/DeleteConfigDialog.vue';
 import GithubProxyDialog from './components/dialogs/GithubProxyDialog.vue';
@@ -119,6 +120,7 @@ const {
   canUploadLocalBatch,
   successRecords,
   typeLabel,
+  typeDescription,
   fieldLabel,
   fieldPlaceholder,
   secretFieldVisible,
@@ -274,7 +276,7 @@ provideWorkspace({
   secretVisibility,
   isAuthed, supportedTypes, selectedFields, targetConfigs, selectedTargetConfig, totalImages, convertedCount,
   canConvertBatch, hasGithubImages, localTargetConfigs, selectedLocalTargetConfig, localMatchedCount, localMissingCount,
-  localConvertedCount, canUploadLocalBatch, successRecords, typeLabel, fieldLabel, fieldPlaceholder, secretFieldVisible, toggleSecretField,
+  localConvertedCount, canUploadLocalBatch, successRecords, typeLabel, typeDescription, fieldLabel, fieldPlaceholder, secretFieldVisible, toggleSecretField,
   statusLabel, targetConfigLabel, localTargetConfigLabel, selectTargetConfig, selectLocalTargetConfig, selectConfigType, handleConfigTypeChange,
   resetConfigForm, resetConvertForm, setActiveTab, editConfig, saveConfig, testConfig, requestDeleteConfig, cancelDeleteConfig,
   confirmDeleteConfig, setDefault, handleFiles, handleFileDrop, addPastedDocument, removeBatchFile, localStatusLabel,
@@ -299,7 +301,7 @@ analyzeBatch, convertBatch, analyzeLocalBatch, uploadLocalBatch, closeGithubProx
       <CircleCheck v-if="toastKind === 'success'" :size="18" />
       <CircleX v-else :size="18" />
       <span>{{ toast }}</span>
-      <button class="toast-close" type="button" aria-label="关闭提示" @click="toast = ''">
+      <button class="toast-close" type="button" :aria-label="t('common.closeNotice')" @click="toast = ''">
         <X :size="16" />
       </button>
     </div>

@@ -6,6 +6,7 @@ import GithubConnectDialog from '../dialogs/GithubConnectDialog.vue';
 import CloudPasswordDialog from '../dialogs/CloudPasswordDialog.vue';
 import { computed, ref, watch } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import { t } from '../../i18n';
 
 const {
   syncAccount,
@@ -73,7 +74,7 @@ function handleSelectRevision(sha: string) {
   void selectRevision(sha);
 }
 
-/// 恢复按钮两步确认（对照 dockpilot）：首次点击进入确认态，再次点击才执行恢复
+/// 恢复按钮两步确认：首次点击进入确认态，再次点击才执行恢复
 async function handleRestoreClick() {
   if (!restoreConfirmArmed.value) {
     restoreConfirmArmed.value = true;
@@ -101,9 +102,9 @@ function submitUnlock() {
     <div class="section-title">
       <div>
         <p class="section-kicker">Sync</p>
-        <h2>云同步配置</h2>
+        <h2>{{ t('sync.title') }}</h2>
       </div>
-      <span class="sync-badge">多台设备间加密同步配置（GitHub 私有 Gist）</span>
+      <span class="sync-badge">{{ t('sync.subtitle') }}</span>
     </div>
 
     <div v-if="syncBanner" class="sync-banner" :class="`banner-${syncBanner.kind}`">
@@ -112,10 +113,10 @@ function submitUnlock() {
           <AlertTriangle v-if="syncBanner.kind !== 'conflict'" :size="15" class="sync-banner-alert-icon" />{{ syncBanner.message }}
         </span>
         <span v-if="syncBanner.kind === 'conflict'" class="sync-banner-detail">
-          云端版本 v{{ syncBanner.remoteVersion }}<template v-if="syncBanner.remoteDeviceName">（{{ syncBanner.remoteDeviceName }}）</template>，本机版本 v{{ syncBanner.localVersion }}。两台设备的同步密码不同。
+          {{ t('sync.conflictDetailA', { remoteVersion: syncBanner.remoteVersion }) }}<template v-if="syncBanner.remoteDeviceName">{{ t('sync.conflictDetailDevice', { device: syncBanner.remoteDeviceName }) }}</template>{{ t('sync.conflictDetailB', { localVersion: syncBanner.localVersion ?? 0 }) }}
         </span>
         <span v-if="syncBanner.kind === 'empty'" class="sync-banner-detail">
-          本机没有图床配置，云端存在 {{ syncBanner.remoteItems.length }} 条图床配置（配置内容已端到端加密，云端只存密文）。为防止误覆盖云端，请选择如何处理：
+          {{ t('sync.emptyDetail', { count: syncBanner.remoteItems.length }) }}
         </span>
         <span v-if="syncBanner.kind === 'blocked'" class="sync-banner-detail">{{ syncBanner.detail }}</span>
       </div>
@@ -127,7 +128,7 @@ function submitUnlock() {
           :disabled="syncBusy"
           @click="openCloudPwdModal"
         >
-          <Download :size="16" />使用云端（输入云端密码）
+          <Download :size="16" />{{ t('sync.useCloud') }}
         </button>
         <button
           v-if="syncBanner.kind === 'conflict'"
@@ -135,7 +136,7 @@ function submitUnlock() {
           type="button"
           :disabled="syncBusy"
           @click="overrideCloudWithLocal"
-        >使用本地覆盖云端</button>
+        >{{ t('sync.useLocal') }}</button>
         <button
           v-if="syncBanner.kind === 'blocked'"
           class="secondary"
@@ -143,7 +144,7 @@ function submitUnlock() {
           :disabled="syncBusy"
           @click="restoreRemoteVersion"
         >
-          <Download :size="16" />恢复云端数据
+          <Download :size="16" />{{ t('sync.restoreCloud') }}
         </button>
         <button
           v-if="syncBanner.kind === 'blocked'"
@@ -152,7 +153,7 @@ function submitUnlock() {
           :disabled="syncBusy"
           @click="forcePushLocal"
         >
-          <Upload :size="16" />强制推送
+          <Upload :size="16" />{{ t('sync.forcePush') }}
         </button>
         <button
           v-if="syncBanner.kind === 'empty'"
@@ -161,7 +162,7 @@ function submitUnlock() {
           :disabled="syncBusy"
           @click="restoreRemoteVersion"
         >
-          <Download :size="16" />恢复云端数据
+          <Download :size="16" />{{ t('sync.restoreCloud') }}
         </button>
         <button
           v-if="syncBanner.kind === 'empty'"
@@ -170,7 +171,7 @@ function submitUnlock() {
           :disabled="syncBusy"
           @click="pushEmptyVaultLocal"
         >
-          <Upload :size="16" />推送本机数据
+          <Upload :size="16" />{{ t('sync.pushLocal') }}
         </button>
       </div>
     </div>
@@ -180,9 +181,9 @@ function submitUnlock() {
         <span class="sync-row-icon"><Cloud :size="20" /></span>
         <div>
           <strong>GitHub Gist</strong>
-          <span v-if="syncConnected && syncTokenInvalid">授权已过期或被撤销，请重新连接；若只是网络波动，可先点「重新验证」</span>
-          <span v-else-if="syncConnected">{{ syncAccount }}（令牌存{{ secretBackend === 'file' ? '加密本机文件' : '系统钥匙串' }}）</span>
-          <span v-else>未连接 —— 授权后配置将加密存入你的私有 Gist</span>
+          <span v-if="syncConnected && syncTokenInvalid">{{ t('sync.tokenExpiredHint') }}</span>
+          <span v-else-if="syncConnected">{{ t('sync.accountHint', { account: syncAccount, backend: secretBackend === 'file' ? t('sync.backendFile') : t('sync.backendKeychain') }) }}</span>
+          <span v-else>{{ t('sync.notConnectedHint') }}</span>
         </div>
       </div>
       <div class="sync-row-actions">
@@ -194,19 +195,19 @@ function submitUnlock() {
             @click="openGithubConnect"
           >
             <RefreshCw v-if="githubConnectPreparing" :size="17" class="spin-icon" />
-            <Cloud v-else :size="17" />连接 GitHub
+            <Cloud v-else :size="17" />{{ t('sync.connect') }}
           </button>
         </template>
         <template v-else-if="syncTokenInvalid">
-          <span class="sync-connected-tag invalid">授权已失效</span>
-          <AppTooltip label="用本机保存的令牌重新校验 GitHub 授权" center>
+          <span class="sync-connected-tag invalid">{{ t('sync.tokenInvalidTag') }}</span>
+          <AppTooltip :label="t('sync.revalidateTip')" center>
             <button
               class="secondary"
               type="button"
               :disabled="syncBusy"
               @click="revalidateConnection"
             >
-              <KeyRound :size="17" />重新验证
+              <KeyRound :size="17" />{{ t('sync.revalidate') }}
             </button>
           </AppTooltip>
           <button
@@ -216,19 +217,19 @@ function submitUnlock() {
             @click="openGithubConnect"
           >
             <RefreshCw v-if="githubConnectPreparing" :size="17" class="spin-icon" />
-            <Cloud v-else :size="17" />重新连接 GitHub
+            <Cloud v-else :size="17" />{{ t('sync.reconnect') }}
           </button>
-          <AppTooltip label="断开连接（清除本地令牌与同步快照）" center>
+          <AppTooltip :label="t('sync.disconnectTip')" center>
             <button class="ghost sync-disconnect" type="button" :disabled="syncBusy" @click="disconnectGithub">
-              <Trash2 :size="17" />断开
+              <Trash2 :size="17" />{{ t('sync.disconnect') }}
             </button>
           </AppTooltip>
         </template>
         <template v-else>
-          <span class="sync-connected-tag">已连接</span>
-          <AppTooltip label="断开连接（清除本地令牌与同步快照）" center>
+          <span class="sync-connected-tag">{{ t('sync.connectedTag') }}</span>
+          <AppTooltip :label="t('sync.disconnectTip')" center>
             <button class="ghost sync-disconnect" type="button" :disabled="syncBusy" @click="disconnectGithub">
-              <Trash2 :size="17" />断开
+              <Trash2 :size="17" />{{ t('sync.disconnect') }}
             </button>
           </AppTooltip>
         </template>
@@ -239,46 +240,46 @@ function submitUnlock() {
       <div class="sync-row-info">
         <span class="sync-row-icon"><KeyRound :size="20" /></span>
         <div>
-          <strong>同步密码</strong>
-          <span v-if="passwordStatus === 'none'">用于端到端加密云端数据（遗忘后云端数据无法恢复）</span>
-          <span v-else-if="passwordStatus === 'locked'">解锁后本机会记住密码，下次启动自动解锁</span>
-          <span v-else-if="passwordBackend">密码已记住到本机密钥库，启动时自动解锁</span>
-          <span v-else>密码仅在本次运行内存中持有（本机密钥库不可用）</span>
+          <strong>{{ t('sync.passwordTitle') }}</strong>
+          <span v-if="passwordStatus === 'none'">{{ t('sync.passwordNoneHint') }}</span>
+          <span v-else-if="passwordStatus === 'locked'">{{ t('sync.passwordLockedHint') }}</span>
+          <span v-else-if="passwordBackend">{{ t('sync.passwordRememberedHint') }}</span>
+          <span v-else>{{ t('sync.passwordMemoryHint') }}</span>
         </div>
       </div>
       <div class="sync-row-actions">
         <template v-if="passwordStatus === 'none'">
-          <span class="sync-state-tag warn">未设密码</span>
+          <span class="sync-state-tag warn">{{ t('sync.noPasswordTag') }}</span>
           <button class="secondary" type="button" :disabled="syncBusy" @click="openPasswordModal('set')">
-            <KeyRound :size="17" />设置密码
+            <KeyRound :size="17" />{{ t('sync.setPassword') }}
           </button>
         </template>
         <template v-else-if="passwordStatus === 'locked'">
-          <span class="sync-state-tag muted">已锁定</span>
+          <span class="sync-state-tag muted">{{ t('sync.lockedTag') }}</span>
           <div class="sync-unlock-row">
             <input
               v-model="unlockInput"
               type="password"
-              placeholder="同步密码"
+              :placeholder="t('sync.passwordPlaceholder')"
               spellcheck="false"
               autocomplete="off"
               @keyup.enter="submitUnlock"
             />
             <button class="primary" type="button" :disabled="!unlockInput" @click="submitUnlock">
-              <Lock :size="17" />解锁
+              <Lock :size="17" />{{ t('sync.unlock') }}
             </button>
           </div>
         </template>
         <template v-else>
-          <span class="sync-state-tag ok">已解锁</span>
-          <AppTooltip label="修改同步密码" center>
+          <span class="sync-state-tag ok">{{ t('sync.unlockedTag') }}</span>
+          <AppTooltip :label="t('sync.changePasswordTip')" center>
             <button class="secondary" type="button" :disabled="syncBusy" @click="openPasswordModal('change')">
-              <KeyRound :size="17" />修改密码
+              <KeyRound :size="17" />{{ t('sync.changePassword') }}
             </button>
           </AppTooltip>
-          <AppTooltip label="锁定并清除本机记住的密码（下次启动需手动解锁）" center>
+          <AppTooltip :label="t('sync.lockTip')" center>
             <button class="secondary" type="button" :disabled="syncBusy" @click="lockSyncPassword">
-              <Lock :size="17" />锁定
+              <Lock :size="17" />{{ t('sync.lock') }}
             </button>
           </AppTooltip>
         </template>
@@ -289,19 +290,19 @@ function submitUnlock() {
       <div class="sync-row-info">
         <span class="sync-row-icon"><Database :size="20" /></span>
         <div>
-          <strong>同步内容</strong>
-          <span>仅同步全部图床配置（加密后存储）；转换记录、任务等本地数据不上云</span>
+          <strong>{{ t('sync.contentTitle') }}</strong>
+          <span>{{ t('sync.contentHint') }}</span>
         </div>
       </div>
-      <span class="sync-count-tag">本地 {{ localConfigCount }} 个配置</span>
+      <span class="sync-count-tag">{{ t('sync.localCount', { count: localConfigCount }) }}</span>
     </div>
 
     <div class="sync-row">
       <div class="sync-row-info">
         <span class="sync-row-icon"><Zap :size="20" /></span>
         <div>
-          <strong>自动同步</strong>
-          <span>配置变更 3 秒后自动上传；启动与窗口切回时自动检查云端更新</span>
+          <strong>{{ t('sync.autoTitle') }}</strong>
+          <span>{{ t('sync.autoHint') }}</span>
         </div>
       </div>
       <label
@@ -324,7 +325,7 @@ function submitUnlock() {
         <span class="sync-row-icon"><RefreshCw :size="20" /></span>
         <div class="sync-status-line">
           <div class="sync-status-title">
-            <strong>同步状态</strong>
+            <strong>{{ t('sync.statusTitle') }}</strong>
             <span class="sync-status-badge" :data-kind="syncStatusBadge.kind">{{ syncStatusBadge.text }}</span>
             <span v-if="remoteVersionBadge" class="sync-status-badge version">{{ remoteVersionBadge }}</span>
           </div>
@@ -333,10 +334,10 @@ function submitUnlock() {
       </div>
       <div class="sync-row-actions">
         <button class="secondary" type="button" :disabled="!canSyncNow" @click="toggleSyncHistory">
-          <History :size="17" />历史版本
+          <History :size="17" />{{ t('sync.historyVersions') }}
         </button>
         <button class="primary" type="button" :disabled="!canSyncNow" @click="syncNow()">
-          <RefreshCw :size="17" :class="{ 'spin-icon': syncBusy }" />{{ syncBusy ? '同步中…' : '立即同步' }}
+          <RefreshCw :size="17" :class="{ 'spin-icon': syncBusy }" />{{ syncBusy ? t('sync.syncing') : t('sync.now') }}
         </button>
       </div>
     </div>
@@ -345,17 +346,17 @@ function submitUnlock() {
       <div v-if="syncHistoryOpen" class="modal-backdrop" role="presentation" @click.self="toggleSyncHistory">
         <section class="confirm-dialog sync-history-dialog" role="dialog" aria-modal="true" aria-labelledby="sync-history-title">
           <div class="sync-dialog-head">
-            <h2 id="sync-history-title"><History :size="20" />历史版本</h2>
-            <button class="ghost icon-only" type="button" aria-label="关闭" @click="toggleSyncHistory"><X :size="18" /></button>
+            <h2 id="sync-history-title"><History :size="20" />{{ t('sync.historyVersions') }}</h2>
+            <button class="ghost icon-only" type="button" :aria-label="t('common.close')" @click="toggleSyncHistory"><X :size="18" /></button>
           </div>
           <p class="sync-history-desc">
-            浏览并恢复 Gist 修订历史中的旧版配置数据。恢复是<strong>整体覆盖（不是合并）</strong>：本机与云端都会变成所选修订的内容，并作为新版本推送，不会改写修订历史。
+            {{ t('syncHistory.descHead') }}<strong>{{ t('syncHistory.descEm') }}</strong>{{ t('syncHistory.descTail') }}
           </p>
           <div class="sync-history-list">
             <p v-if="syncHistoryLoading" class="sync-history-hint">
-              <RefreshCw :size="14" class="spin-icon" />正在获取修订历史…
+              <RefreshCw :size="14" class="spin-icon" />{{ t('syncHistory.loading') }}
             </p>
-            <p v-else-if="syncHistory.length === 0" class="sync-history-hint">暂无修订历史，完成一次同步后这里会显示记录</p>
+            <p v-else-if="syncHistory.length === 0" class="sync-history-hint">{{ t('syncHistory.empty') }}</p>
             <template v-else>
               <div class="sync-history-items">
                 <button
@@ -377,32 +378,32 @@ function submitUnlock() {
                 </button>
               </div>
               <p v-if="revisionPreviewLoading" class="sync-history-decrypting">
-                <RefreshCw :size="14" class="spin-icon" />正在解密该修订…
+                <RefreshCw :size="14" class="spin-icon" />{{ t('syncHistory.decrypting') }}
               </p>
               <div v-else-if="revisionPreview" class="sync-history-preview-card">
                 <p class="sync-history-preview-title">
-                  <AlertTriangle :size="14" />恢复预览 —— 整体覆盖，不是合并
+                  <AlertTriangle :size="14" />{{ t('syncHistory.previewTitle') }}
                 </p>
                 <p>
-                  图床配置：<span :class="{ 'sync-preview-shrink': revisionShrink > 0 }">{{ revisionPreview.currentCount }}</span> → {{ revisionPreview.configCount }} 条<template v-if="revisionShrink > 0"><span class="sync-preview-shrink">（将减少 {{ revisionShrink }} 条）</span></template>
+                  {{ t('syncHistory.previewConfigs', { current: revisionPreview.currentCount, target: revisionPreview.configCount }) }}<template v-if="revisionShrink > 0"><span class="sync-preview-shrink">{{ t('syncHistory.previewShrink', { count: revisionShrink }) }}</span></template>
                 </p>
                 <p>
-                  来源：版本 v{{ revisionPreview.version }}<template v-if="revisionPreview.deviceName"> · {{ revisionPreview.deviceName }}</template><template v-if="revisionPreview.appVersion">（{{ revisionPreview.appVersion }}）</template> · 数据时间 {{ revisionPreview.updatedAtText }}
+                  {{ t('syncHistory.previewSource', { version: revisionPreview.version }) }}<template v-if="revisionPreview.deviceName"> · {{ revisionPreview.deviceName }}</template><template v-if="revisionPreview.appVersion">（{{ revisionPreview.appVersion }}）</template> · {{ t('syncHistory.previewDataTime', { time: revisionPreview.updatedAtText }) }}
                 </p>
-                <p class="sync-history-preview-note">恢复后本机与云端都变成该内容并作为新版本推送；被覆盖的内容可从修订历史再次恢复回来</p>
+                <p class="sync-history-preview-note">{{ t('syncHistory.previewNote') }}</p>
               </div>
               <p v-else-if="revisionError" class="sync-history-error-card">{{ revisionError }}</p>
             </template>
           </div>
           <div class="dialog-actions">
-            <button class="ghost" type="button" @click="toggleSyncHistory">关闭</button>
+            <button class="ghost" type="button" @click="toggleSyncHistory">{{ t('common.close') }}</button>
             <button
               class="danger"
               :class="{ 'restore-ready': !!revisionPreview && !restoringRevision && !syncBusy }"
               type="button"
               :disabled="!revisionPreview || revisionPreviewLoading || restoringRevision || syncBusy"
               @click="handleRestoreClick"
-            >{{ restoringRevision ? '恢复中…' : restoreConfirmArmed ? `确认恢复（覆盖当前 ${remoteVersionBadge || 'v?'}）` : '恢复此版本（覆盖当前配置）' }}</button>
+            >{{ restoringRevision ? t('syncHistory.restoring') : restoreConfirmArmed ? t('syncHistory.confirmRestore', { version: remoteVersionBadge || 'v?' }) : t('syncHistory.restore') }}</button>
           </div>
         </section>
       </div>

@@ -1,5 +1,6 @@
 import { computed, reactive, ref, type Ref } from 'vue';
-import { defaultConfigValues, fallbackTypes, zhFieldLabels, zhTypeLabels } from './constants';
+import { defaultConfigValues, fallbackTypes } from './constants';
+import { hasMessage, t } from '../../i18n';
 import type { ConfigField, PicbedConfig, PicbedTypeDef, WorkspaceTab } from './types';
 
 type ConfigFormDeps = {
@@ -32,22 +33,28 @@ export function useWorkspaceConfigForm({ activeTab, configs, showError, clearNot
   );
 
   function typeLabel(value: string) {
-    return zhTypeLabels[value] || typeDefs.value.find(item => item.value === value)?.label || value;
+    const key = `picbed.type.${value}`;
+    return hasMessage(key) ? t(key) : typeDefs.value.find(item => item.value === value)?.label || value;
+  }
+  function typeDescription(value: string) {
+    const key = `picbed.desc.${value}`;
+    return hasMessage(key) ? t(key) : '';
   }
   function fieldLabel(field: ConfigField) {
     if (configForm.picbed_type === 'qiniu' && field.key === 'custom_domain') {
-      return '自定义域名 / CDN测试域名';
+      return t('field.qiniuCustomDomain');
     }
     if (configForm.picbed_type === 'upyun' && field.key === 'bucket') {
-      return '服务名';
+      return t('field.upyunBucket');
     }
     if (configForm.picbed_type === 'upyun' && field.key === 'custom_domain') {
-      return '加速域名 / 测试域名';
+      return t('field.upyunCustomDomain');
     }
     if (configForm.picbed_type === 'minio' && field.key === 'endpoint') {
-      return 'Endpoint';
+      return t('field.minioEndpoint');
     }
-    return zhFieldLabels[field.key] || field.label;
+    const key = `field.${field.key}`;
+    return hasMessage(key) ? t(key) : field.label;
   }
   function fieldPlaceholder(field: ConfigField) {
     return field.placeholder || fieldLabel(field);
@@ -66,6 +73,7 @@ export function useWorkspaceConfigForm({ activeTab, configs, showError, clearNot
     return types.map(item => ({
       ...item,
       label: typeLabel(item.value),
+      description: typeDescription(item.value),
       fields: item.fields?.length ? item.fields : fallbackTypes.find(fallback => fallback.value === item.value)?.fields || [],
     }));
   }
@@ -120,10 +128,10 @@ export function useWorkspaceConfigForm({ activeTab, configs, showError, clearNot
     const invalid: string[] = [];
     if (!configForm.config_name.trim()) {
       configErrors.config_name = 'invalid';
-      missing.push('配置名称');
+      missing.push(t('config.nameLabel'));
     } else if (configs.value.some(item => item.id !== configForm.id && item.config_name === configForm.config_name.trim())) {
       configErrors.config_name = 'invalid';
-      invalid.push('配置名称不能重复');
+      invalid.push(t('msg.config.nameDuplicate'));
     }
     selectedFields.value.forEach(field => {
       if (field.required && !String(configForm.values[field.key] || '').trim()) {
@@ -133,7 +141,7 @@ export function useWorkspaceConfigForm({ activeTab, configs, showError, clearNot
     });
     if (missing.length || invalid.length) {
       const parts = [];
-      if (missing.length) parts.push(`${missing.join('、')}不能为空`);
+      if (missing.length) parts.push(t('msg.config.missingFields', { fields: missing.join('、') }));
       if (invalid.length) parts.push(invalid.join('、'));
       showError(parts.join('；'));
       return false;
@@ -149,6 +157,7 @@ export function useWorkspaceConfigForm({ activeTab, configs, showError, clearNot
     supportedTypes,
     selectedFields,
     typeLabel,
+    typeDescription,
     fieldLabel,
     fieldPlaceholder,
     secretFieldVisible,

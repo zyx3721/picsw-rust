@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { RequestError } from './types';
+import { t } from '../../i18n';
 
 type LocalImageUpload = { key: string; name: string; data: string };
 
@@ -19,7 +20,7 @@ function parsePathId(path: string) {
 
 function toRequestError(error: unknown): RequestError {
   if (error instanceof Error) return error as RequestError;
-  const message = typeof error === 'string' && error ? error : '请求失败';
+  const message = typeof error === 'string' && error ? error : t('msg.requestFailed');
   return new Error(message) as RequestError;
 }
 
@@ -31,14 +32,14 @@ function readFileAsBase64(file: File) {
       const base64 = result.includes(',') ? result.slice(result.indexOf(',') + 1) : result;
       resolve(base64);
     };
-    reader.onerror = () => reject(new Error(`读取本地图片失败：${file.name}`));
+    reader.onerror = () => reject(new Error(t('msg.readImageFailed', { name: file.name })));
     reader.readAsDataURL(file);
   });
 }
 
 async function invokeLocalConvertTask<T>(formData: FormData): Promise<T> {
   const manifestRaw = formData.get('manifest');
-  if (typeof manifestRaw !== 'string') throw new Error('本地上传清单格式不正确');
+  if (typeof manifestRaw !== 'string') throw new Error(t('msg.localManifestInvalid'));
   const manifest = JSON.parse(manifestRaw);
   const images: LocalImageUpload[] = [];
   for (const [key, value] of formData.entries()) {
@@ -121,7 +122,7 @@ export function createWorkspaceRequest() {
         return await invoke<T>('get_record', { id: parsePathId(normalized) });
       }
 
-      throw new Error(`未支持的本地接口：${route}`);
+      throw new Error(t('msg.unsupportedRoute', { route }));
     } catch (error) {
       throw toRequestError(error);
     }

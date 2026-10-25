@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { FileSearch, Wand2 } from 'lucide-vue-next';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import { t } from '../../i18n';
 
 const {
   githubProxyDialogOpen,
@@ -17,18 +18,18 @@ const {
     <section class="confirm-dialog github-proxy-dialog" role="dialog" aria-modal="true" aria-labelledby="github-proxy-title">
       <div class="dialog-icon github-proxy-icon"><FileSearch :size="22" /></div>
       <div class="dialog-copy">
-        <h2 id="github-proxy-title">检测到 GitHub 图床地址</h2>
-        <p>当前识别结果包含 GitHub 图片文件地址，可在转换前为这些地址添加代理前缀，便于第三方服务下载。</p>
+        <h2 id="github-proxy-title">{{ t('dlg.proxy.title') }}</h2>
+        <p>{{ t('dlg.proxy.desc') }}</p>
       </div>
-      <label class="checkbox proxy-toggle"><input v-model="githubProxyEnabled" type="checkbox" />启用图片代理</label>
+      <label class="checkbox proxy-toggle"><input v-model="githubProxyEnabled" type="checkbox" />{{ t('dlg.proxy.enable') }}</label>
       <label v-if="githubProxyEnabled" class="proxy-url-field">
-        <span class="field-label-text">代理地址</span>
+        <span class="field-label-text">{{ t('dlg.proxy.urlLabel') }}</span>
         <input v-model.trim="githubProxyURL" placeholder="https://gh-proxy.com/" />
       </label>
       <div class="dialog-actions">
-        <button class="ghost" type="button" @click="closeGithubProxyDialog">取消</button>
+        <button class="ghost" type="button" @click="closeGithubProxyDialog">{{ t('common.cancel') }}</button>
         <button class="primary" type="button" :disabled="loading" @click="confirmGithubProxyConvert">
-          <Wand2 :size="17" />{{ loading ? '转换中...' : '继续转换' }}
+          <Wand2 :size="17" />{{ loading ? t('dlg.proxy.converting') : t('dlg.proxy.continue') }}
         </button>
       </div>
     </section>

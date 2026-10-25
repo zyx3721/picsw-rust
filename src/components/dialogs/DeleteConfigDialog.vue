@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Trash2 } from 'lucide-vue-next';
+import { t } from '../../i18n';
 import { nextTick, ref, watch } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 
@@ -17,13 +18,13 @@ watch(deleteTarget, open => {
     <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-config-title">
       <div class="dialog-icon"><Trash2 :size="22" /></div>
       <div class="dialog-copy">
-        <h2 id="delete-config-title">删除图床配置</h2>
-        <p>确认删除“{{ deleteTarget.config_name }}”吗？删除后无法用于后续转换。</p>
+        <h2 id="delete-config-title">{{ t('dlg.delete.title') }}</h2>
+        <p>{{ t('dlg.delete.desc', { name: deleteTarget.config_name }) }}</p>
       </div>
       <div class="dialog-actions">
-        <button class="ghost" type="button" @click="cancelDeleteConfig">取消</button>
+        <button class="ghost" type="button" @click="cancelDeleteConfig">{{ t('common.cancel') }}</button>
         <button ref="confirmButton" class="danger" type="button" :disabled="loading" @click="confirmDeleteConfig">
-          <Trash2 :size="17" />删除
+          <Trash2 :size="17" />{{ t('dlg.delete.confirm') }}
         </button>
       </div>
     </section>

@@ -2,6 +2,7 @@
 import { Download, X } from 'lucide-vue-next';
 import { ref, watch } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import { t } from '../../i18n';
 
 const { cloudPwdModalOpen, resolveConflictWithCloudPassword, closeCloudPwdModal } = useWorkspaceContext();
 
@@ -38,17 +39,15 @@ async function handleSubmit() {
   <div v-if="cloudPwdModalOpen" class="modal-backdrop" role="presentation" @click.self="closeCloudPwdModal">
     <section class="confirm-dialog cloud-pwd-dialog" role="dialog" aria-modal="true" aria-labelledby="cloud-pwd-title">
       <div class="sync-dialog-head">
-        <h2 id="cloud-pwd-title" class="blue"><Download :size="16" />输入云端密码</h2>
-        <button class="ghost icon-only" type="button" aria-label="关闭" @click="closeCloudPwdModal"><X :size="18" /></button>
+        <h2 id="cloud-pwd-title" class="blue"><Download :size="16" />{{ t('dlg.cloudPwd.title') }}</h2>
+        <button class="ghost icon-only" type="button" :aria-label="t('common.close')" @click="closeCloudPwdModal"><X :size="18" /></button>
       </div>
-      <p class="cloud-pwd-desc">
-        云端数据由另一台设备的同步密码加密。输入该密码以解密并恢复；恢复后本机的同步密码将被重置为云端密码。
-      </p>
+      <p class="cloud-pwd-desc">{{ t('dlg.cloudPwd.desc') }}</p>
       <div class="cloud-pwd-input-row">
         <input
           v-model="cloudPassword"
           type="password"
-          placeholder="云端（另一台设备的）同步密码"
+          :placeholder="t('dlg.cloudPwd.placeholder')"
           spellcheck="false"
           autocomplete="off"
           autofocus
@@ -57,9 +56,9 @@ async function handleSubmit() {
       </div>
       <p v-if="error" class="sync-dialog-error">{{ error }}</p>
       <div class="dialog-actions">
-        <button class="ghost" type="button" @click="closeCloudPwdModal">取消</button>
+        <button class="ghost" type="button" @click="closeCloudPwdModal">{{ t('common.cancel') }}</button>
         <button class="primary blue" type="button" :disabled="submitting || !cloudPassword" @click="handleSubmit">
-          {{ submitting ? '解密中…' : '解密并恢复' }}
+          {{ submitting ? t('dlg.cloudPwd.decrypting') : t('dlg.cloudPwd.submit') }}
         </button>
       </div>
     </section>

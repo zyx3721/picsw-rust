@@ -6,16 +6,12 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import type { CloseAction } from '../../composables/workspace/closeBehavior';
 import { relativeTimeText } from '../../composables/workspace/updateChecker';
+import { t } from '../../i18n';
 import AppTooltip from '../AppTooltip.vue';
 
 const GITHUB_URL = 'https://github.com/zyx3721/picsw-rust';
 const ISSUES_URL = 'https://github.com/zyx3721/picsw-rust/issues';
 const RELEASES_URL = 'https://github.com/zyx3721/picsw-rust/releases';
-const CLOSE_ACTION_OPTIONS: { value: CloseAction; label: string }[] = [
-  { value: 'ask', label: '每次询问' },
-  { value: 'tray', label: '最小化到托盘' },
-  { value: 'quit', label: '退出应用' },
-];
 const {
   showError,
   updateStatus,
@@ -48,20 +44,27 @@ const updateProgressText = computed(() => {
   const done = formatBytes(progress.downloaded);
   if (progress.total > 0) {
     const percent = Math.min(100, Math.floor((progress.downloaded / progress.total) * 100));
-    return `${percent}%（${done} / ${formatBytes(progress.total)}）`;
+    return t('about.progress', { percent, done, total: formatBytes(progress.total) });
   }
-  return `已下载 ${done}`;
+  return t('about.downloaded', { size: done });
 });
 
 /// 自动检查开关行的描述：有检查记录时附上次检查时间
 const autoCheckDescription = computed(() => {
-  const base = '启动后静默检查新版本（每 24 小时一次），可随时手动检查';
-  return lastCheckAt.value > 0 ? `上次检查：${relativeTimeText(lastCheckAt.value)}；${base}` : base;
+  const base = t('about.autoCheckDesc');
+  return lastCheckAt.value > 0
+    ? t('about.lastCheckSuffix', { when: relativeTimeText(lastCheckAt.value) }) + base
+    : base;
 });
 
 /// 下拉框展示当前关闭行为文案
+const closeActionOptions = computed(() => [
+  { value: 'ask' as CloseAction, label: t('about.closeAsk') },
+  { value: 'tray' as CloseAction, label: t('about.closeTray') },
+  { value: 'quit' as CloseAction, label: t('about.closeQuit') },
+]);
 const closeActionLabel = computed(
-  () => CLOSE_ACTION_OPTIONS.find(option => option.value === closeAction.value)?.label ?? '每次询问'
+  () => closeActionOptions.value.find(option => option.value === closeAction.value)?.label ?? t('about.closeAsk')
 );
 
 function toggleCloseActionMenu() {
@@ -90,10 +93,10 @@ function formatBytes(bytes: number) {
 
 /// 按钮文案随更新状态机切换，宽度随文本自适应
 const updateButtonText = computed(() => {
-  if (updateStatus.value === 'checking') return '检查中...';
-  if (updateStatus.value === 'downloading') return '更新中...';
-  if (updateStatus.value === 'available' && updateVersion.value) return `更新到 v${updateVersion.value}`;
-  return '检查更新';
+  if (updateStatus.value === 'checking') return t('about.checking');
+  if (updateStatus.value === 'downloading') return t('about.updating');
+  if (updateStatus.value === 'available' && updateVersion.value) return t('about.updateTo', { version: updateVersion.value });
+  return t('about.checkUpdates');
 });
 
 onMounted(async () => {
@@ -124,17 +127,17 @@ async function openExternal(url: string, fallback: string) {
 
 /// 打开项目仓库主页
 async function openGithubRepo() {
-  await openExternal(GITHUB_URL, '打开项目主页失败');
+  await openExternal(GITHUB_URL, t('about.openGithubFailed'));
 }
 
 /// 打开问题反馈页
 async function openIssues() {
-  await openExternal(ISSUES_URL, '打开反馈页失败');
+  await openExternal(ISSUES_URL, t('about.openIssuesFailed'));
 }
 
 /// 打开发布说明页
 async function openReleases() {
-  await openExternal(RELEASES_URL, '打开发布页失败');
+  await openExternal(RELEASES_URL, t('about.openReleasesFailed'));
 }
 </script>
 
@@ -144,18 +147,18 @@ async function openReleases() {
     <div class="section-title">
       <div>
         <p class="section-kicker">About</p>
-        <h2>关于<span class="about-title-hint">版本与项目信息</span></h2>
+        <h2>{{ t('tab.about') }}<span class="about-title-hint">{{ t('about.titleHint') }}</span></h2>
       </div>
       <div class="about-update-area">
-        <span v-if="showUpToDate" class="about-update-tag">已是最新版</span>
+        <span v-if="showUpToDate" class="about-update-tag">{{ t('about.upToDate') }}</span>
         <AppTooltip v-if="updateStatus === 'available' && updateVersion" :label="updateNotes" pre>
-          <span class="about-update-tag">检测到新版本： v{{ updateVersion }}</span>
+          <span class="about-update-tag">{{ t('about.newVersionTag', { version: updateVersion }) }}</span>
         </AppTooltip>
         <span v-if="updateStatus === 'downloading'" class="about-update-tag">{{ updateProgressText }}</span>
         <template v-if="updateStatus === 'downloaded'">
-          <span class="about-update-tag">更新包已就绪</span>
-          <button class="secondary about-update-btn" type="button" @click="openUpdatePackage">打开更新包</button>
-          <button class="primary about-update-btn" type="button" @click="applyUpdate">应用更新</button>
+          <span class="about-update-tag">{{ t('about.packageReady') }}</span>
+          <button class="secondary about-update-btn" type="button" @click="openUpdatePackage">{{ t('about.openPackage') }}</button>
+          <button class="primary about-update-btn" type="button" @click="applyUpdate">{{ t('about.applyUpdate') }}</button>
         </template>
         <button v-else class="primary about-update-btn" type="button" :disabled="updateBusy" @click="handleUpdateClick">
           <RefreshCw v-if="updateStatus === 'checking' || updateStatus === 'downloading'" :size="17" class="spin-icon" />
@@ -168,7 +171,7 @@ async function openReleases() {
       <div class="about-row-main">
         <span class="about-row-icon"><RefreshCw :size="20" /></span>
         <div class="about-row-info">
-          <strong>自动检查更新</strong>
+          <strong>{{ t('about.autoCheckTitle') }}</strong>
           <span>{{ autoCheckDescription }}</span>
         </div>
       </div>
@@ -182,8 +185,8 @@ async function openReleases() {
       <div class="about-row-main">
         <span class="about-row-icon"><LogOut :size="20" /></span>
         <div class="about-row-info">
-          <strong>关闭窗口时</strong>
-          <span>每次询问为首次关闭时弹窗；最小化后应用在后台运行，转换任务不受影响，可从系统托盘恢复窗口或退出</span>
+          <strong>{{ t('about.closeBehaviorTitle') }}</strong>
+          <span>{{ t('about.closeBehaviorDesc') }}</span>
         </div>
       </div>
       <div class="custom-select about-close-select" :class="{ open: closeActionOpen }">
@@ -193,7 +196,7 @@ async function openReleases() {
         </button>
         <div v-if="closeActionOpen" class="select-menu">
           <button
-            v-for="option in CLOSE_ACTION_OPTIONS"
+            v-for="option in closeActionOptions"
             :key="option.value"
             class="select-option"
             :class="{ selected: option.value === closeAction }"
@@ -208,7 +211,7 @@ async function openReleases() {
       <div class="about-row-main">
         <span class="about-row-icon"><Package :size="20" /></span>
         <div class="about-row-info">
-          <strong>PicBed Switcher 版本</strong>
+          <strong>{{ t('about.versionTitle') }}</strong>
         </div>
       </div>
       <span class="about-version">{{ appVersion || '—' }}</span>
@@ -219,7 +222,7 @@ async function openReleases() {
         <span class="about-row-icon"><Code2 :size="20" /></span>
         <div class="about-row-info">
           <strong>GitHub</strong>
-          <span>源代码，欢迎 Star</span>
+          <span>{{ t('about.githubHint') }}</span>
         </div>
       </div>
       <button class="about-link" type="button" @click="openGithubRepo">
@@ -232,8 +235,8 @@ async function openReleases() {
       <div class="about-row-main">
         <span class="about-row-icon"><Bug :size="20" /></span>
         <div class="about-row-info">
-          <strong>反馈问题</strong>
-          <span>报告 Bug 或提出建议</span>
+          <strong>{{ t('about.issuesTitle') }}</strong>
+          <span>{{ t('about.issuesHint') }}</span>
         </div>
       </div>
       <button class="about-link" type="button" @click="openIssues">
@@ -246,8 +249,8 @@ async function openReleases() {
       <div class="about-row-main">
         <span class="about-row-icon"><FileText :size="20" /></span>
         <div class="about-row-info">
-          <strong>更新内容</strong>
-          <span>查看发布说明</span>
+          <strong>{{ t('about.releaseTitle') }}</strong>
+          <span>{{ t('about.releaseHint') }}</span>
         </div>
       </div>
       <button class="about-link" type="button" @click="openReleases">

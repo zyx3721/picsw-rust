@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import type { ConversionRecord, ConversionTask, LocalDocument, LocalImageFile, MarkdownImage, PicbedConfig } from './types';
+import { t } from '../../i18n';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const LOCAL_UPLOAD_WORKSPACE_STORAGE_KEY = 'picbed_local_upload_workspace';
@@ -79,14 +80,14 @@ export function useWorkspaceLocalUpload({
   );
 
   function localTargetConfigLabel(config?: PicbedConfig) {
-    return config ? `${config.config_name} · ${typeLabel(config.picbed_type)}` : '请选择';
+    return config ? `${config.config_name} · ${typeLabel(config.picbed_type)}` : t('common.pleaseSelect');
   }
   function selectLocalTargetConfig(id: number) {
     localTargetConfigId.value = id;
     localTargetDropdownOpen.value = false;
   }
   function localStatusLabel(status: LocalDocument['status']) {
-    return { ready: '待匹配', analyzed: '已匹配', success: '已上传', failed: '失败' }[status];
+    return { ready: t('msg.local.statusReady'), analyzed: t('msg.local.statusMatched'), success: t('msg.local.statusUploaded'), failed: t('msg.statusFailed') }[status];
   }
   function readPersistedLocalUploadWorkspace() {
     try {
@@ -134,7 +135,7 @@ export function useWorkspaceLocalUpload({
   async function addLocalDocuments(fileList: FileList | File[]) {
     const files = Array.from(fileList).filter(file => file.name.toLowerCase().endsWith('.md'));
     if (!files.length) {
-      showError('请上传或拖动 .md 文件');
+      showError(t('msg.needMdFiles'));
       return;
     }
     const loaded = await Promise.all(
@@ -154,7 +155,7 @@ export function useWorkspaceLocalUpload({
     localDocuments.value = [...localDocuments.value, ...loaded];
     analyzeLocalMatches();
     persistLocalUploadWorkspace();
-    showMessage(`已加入 ${loaded.length} 个 Markdown 文档`);
+    showMessage(t('msg.local.addedDocs', { count: loaded.length }));
   }
   async function handleLocalDocumentFiles(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -168,7 +169,7 @@ export function useWorkspaceLocalUpload({
   function addLocalImages(fileList: FileList | File[]) {
     const files = Array.from(fileList).filter(isImageFile);
     if (!files.length) {
-      showError('请上传本地图片文件或图片目录');
+      showError(t('msg.local.needImages'));
       return;
     }
     const loaded = files.map(file => ({
@@ -179,7 +180,7 @@ export function useWorkspaceLocalUpload({
     }));
     localImages.value = [...localImages.value, ...loaded];
     analyzeLocalMatches();
-    showMessage(`已加入 ${loaded.length} 张本地图片`);
+    showMessage(t('msg.local.addedImages', { count: loaded.length }));
   }
   function handleLocalImageFiles(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -200,19 +201,19 @@ export function useWorkspaceLocalUpload({
   }
   async function analyzeLocalBatch() {
     if (!localDocuments.value.length) {
-      showError('请先添加 Markdown 文档');
+      showError(t('msg.local.needDocs'));
       return;
     }
     analyzeLocalMatches();
     persistLocalUploadWorkspace();
-    showMessage(`已匹配 ${localMatchedCount.value} 张本地图片`);
+    showMessage(t('msg.local.matchedCount', { count: localMatchedCount.value }));
   }
   function syncLocalTaskProgress(task: ConversionTask) {
     updateTaskProgress({
       current: taskProgressValue(task),
       success: task.success,
       failed: task.failed,
-      message: task.message || '本地上传任务执行中',
+      message: task.message || t('msg.local.taskRunning'),
     });
   }
   function applyLocalTaskRecords(data: LocalTaskData) {
@@ -233,7 +234,7 @@ export function useWorkspaceLocalUpload({
         document.status = 'failed';
         document.convertedContent = '';
         document.changed = 0;
-        document.error = '未找到上传替换结果';
+        document.error = t('msg.local.noResult');
         continue;
       }
       document.status = record.status === 'success' ? 'success' : 'failed';
@@ -259,10 +260,10 @@ export function useWorkspaceLocalUpload({
         const finalStatus = data.task.failed > 0 ? 'failed' : 'success';
         finishTaskProgress({
           status: finalStatus,
-          message: data.task.message || `本地图片上传完成，成功 ${data.task.success} 个，失败 ${data.task.failed} 个`,
-          detail: '可以关闭此窗口并下载替换后的文档。',
+          message: data.task.message || t('msg.local.taskDone', { success: data.task.success, failed: data.task.failed }),
+          detail: t('msg.local.taskDoneHint'),
         });
-        showMessage(`本地图片上传完成，成功 ${localConvertedCount.value} 个文档`);
+        showMessage(t('msg.local.batchDone', { count: localConvertedCount.value }));
         persistLocalUploadWorkspace(0);
         await loadRecords();
         return;
@@ -273,27 +274,27 @@ export function useWorkspaceLocalUpload({
   }
   async function uploadLocalBatch() {
     if (!localTargetConfigId.value) {
-      showError('请先选择目标图床配置');
+      showError(t('msg.needTarget'));
       return;
     }
     if (!localDocuments.value.length) {
-      showError('请先添加 Markdown 文档');
+      showError(t('msg.local.needDocs'));
       return;
     }
     analyzeLocalMatches();
     if (localMissingCount.value > 0) {
-      showError('仍有本地图片未匹配，请补充图片文件或目录');
+      showError(t('msg.local.hasMissing'));
       return;
     }
     if (!localMatchedCount.value) {
-      showError('未匹配到本地图片，无需上传');
+      showError(t('msg.local.noMatched'));
       return;
     }
     loading.value = true;
     startTaskProgress({
-      title: '本地上传替换中',
-      message: '正在创建本地上传任务',
-      detail: `共 ${localDocuments.value.length} 个文档，${localMatchedCount.value} 张本地图片。`,
+      title: t('msg.local.progressTitle'),
+      message: t('msg.local.creating'),
+      detail: t('msg.local.progressDetail', { documents: localDocuments.value.length, images: localMatchedCount.value }),
       total: localDocuments.value.length,
     });
     try {
@@ -309,16 +310,16 @@ export function useWorkspaceLocalUpload({
       activeLocalTaskId = taskId;
       persistLocalUploadWorkspace(taskId);
       localImages.value = [];
-      updateTaskProgress({ message: created.task.message || '本地上传任务已加入队列', current: 0, success: 0, failed: 0 });
+      updateTaskProgress({ message: created.task.message || t('msg.local.taskQueued'), current: 0, success: 0, failed: 0 });
       await pollLocalUploadTask(taskId);
     } catch (err) {
       persistLocalUploadWorkspace(activeLocalTaskId);
       finishTaskProgress({
         status: 'failed',
-        message: activeLocalTaskId ? '本地上传任务进度同步失败' : '本地图片上传失败',
-        detail: err instanceof Error ? err.message : '本地图片上传失败，请稍后重试',
+        message: activeLocalTaskId ? t('msg.local.progressSyncFailed') : t('msg.local.uploadFailed'),
+        detail: err instanceof Error ? err.message : t('msg.local.uploadFailedHint'),
       });
-      showError(err instanceof Error ? err.message : '本地图片上传失败');
+      showError(err instanceof Error ? err.message : t('msg.local.uploadFailed'));
       await loadRecords();
     } finally {
       loading.value = false;
@@ -332,17 +333,17 @@ export function useWorkspaceLocalUpload({
     });
     if (!targetPath) return;
     await invoke('write_text_file', { path: targetPath, content: item.convertedContent });
-    showMessage('替换后的文档已保存');
+    showMessage(t('msg.local.saved'));
   }
   async function downloadAllLocalFiles() {
     const targets = localDocuments.value.filter(document => document.convertedContent);
     if (!targets.length) return;
-    const directory = await open({ directory: true, title: '选择保存目录', multiple: false });
+    const directory = await open({ directory: true, title: t('msg.chooseSaveDir'), multiple: false });
     if (typeof directory !== 'string' || !directory) return;
     for (const document of targets) {
       await invoke('write_text_file', { path: `${directory}/${document.filename || 'converted.md'}`, content: document.convertedContent });
     }
-    showMessage(`已保存 ${targets.length} 个替换后的文档`);
+    showMessage(t('msg.local.savedCount', { count: targets.length }));
   }
   function restoreLocalUploadWorkspace() {
     const state = readPersistedLocalUploadWorkspace();
@@ -354,9 +355,9 @@ export function useWorkspaceLocalUpload({
 
     loading.value = true;
     startTaskProgress({
-      title: '本地上传替换中',
-      message: '正在恢复后台任务进度',
-      detail: `已恢复 ${localDocuments.value.length} 个文档，任务会继续同步进度。`,
+      title: t('msg.local.progressTitle'),
+      message: t('msg.convert.progressRestoring'),
+      detail: t('msg.convert.progressRestored', { count: localDocuments.value.length }),
       total: Math.max(localDocuments.value.length, 1),
     });
     void pollLocalUploadTask(state.activeTaskId, 0)
@@ -365,10 +366,10 @@ export function useWorkspaceLocalUpload({
         persistLocalUploadWorkspace(activeLocalTaskId);
         finishTaskProgress({
           status: 'failed',
-          message: '本地上传任务进度同步失败',
-          detail: err instanceof Error ? err.message : '请稍后重试',
+          message: t('msg.local.progressSyncFailed'),
+          detail: err instanceof Error ? err.message : t('msg.retryHint'),
         });
-        showError(err instanceof Error ? err.message : '本地上传任务进度同步失败');
+        showError(err instanceof Error ? err.message : t('msg.local.progressSyncFailed'));
       })
       .finally(() => {
         loading.value = false;

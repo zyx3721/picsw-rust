@@ -1,5 +1,6 @@
 import type { Ref } from 'vue';
 import type { PicbedConfig } from './types';
+import { t } from '../../i18n';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -53,11 +54,11 @@ export function useWorkspaceConfigActions({
       } else {
         await request('/api/picbed/configs', { method: 'POST', body: JSON.stringify(payload) });
       }
-      showMessage(configForm.id ? '配置已更新' : '配置已保存');
+      showMessage(configForm.id ? t('msg.config.updated') : t('msg.config.saved'));
       resetConfigForm();
       await loadConfigs();
     } catch (err) {
-      showError(err instanceof Error ? err.message : '保存配置失败');
+      showError(err instanceof Error ? err.message : t('msg.config.saveFailed'));
     } finally {
       loading.value = false;
     }
@@ -73,20 +74,20 @@ export function useWorkspaceConfigActions({
     const id = deleteTarget.value.id;
     try {
       await request(`/api/picbed/configs/${id}`, { method: 'DELETE' });
-      showMessage('配置已删除');
+      showMessage(t('msg.config.deleted'));
       cancelDeleteConfig();
       await loadConfigs();
     } catch (err) {
-      showError(err instanceof Error ? err.message : '删除配置失败');
+      showError(err instanceof Error ? err.message : t('msg.config.deleteFailed'));
     }
   }
   async function setDefault(id: number) {
     try {
       await request(`/api/picbed/configs/${id}/default`, { method: 'PUT' });
-      showMessage('默认配置已更新');
+      showMessage(t('msg.config.defaultUpdated'));
       await loadConfigs();
     } catch (err) {
-      showError(err instanceof Error ? err.message : '设置默认失败');
+      showError(err instanceof Error ? err.message : t('msg.config.defaultFailed'));
     }
   }
 
@@ -95,13 +96,13 @@ export function useWorkspaceConfigActions({
     try {
       if (config) {
         const data = await request<{ message: string }>(`/api/picbed/configs/${config.id}/test`, { method: 'POST' });
-        showMessage(data.message || '配置测试通过');
+        showMessage(data.message || t('msg.config.testPassed'));
         return;
       }
       if (!validateConfigForm()) return;
       const payload = {
         picbed_type: configForm.picbed_type,
-        config_name: configForm.config_name || '临时测试配置',
+        config_name: configForm.config_name || t('msg.config.tempName'),
         is_default: configForm.is_default,
         config: selectedFields.value.reduce((values, field) => {
           const value = configForm.values[field.key];
@@ -110,9 +111,9 @@ export function useWorkspaceConfigActions({
         }, {} as Record<string, string>),
       };
       const data = await request<{ message: string }>('/api/picbed/configs/test', { method: 'POST', body: JSON.stringify(payload) });
-      showMessage(data.message || '配置测试通过');
+      showMessage(data.message || t('msg.config.testPassed'));
     } catch (err) {
-      showError(err instanceof Error ? err.message : '配置测试失败');
+      showError(err instanceof Error ? err.message : t('msg.config.testFailed'));
     } finally {
       loading.value = false;
     }

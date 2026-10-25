@@ -2,6 +2,7 @@
 import { CheckCircle2, LoaderCircle, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import { t } from '../../i18n';
 
 const { taskProgress, closeTaskProgress } = useWorkspaceContext();
 
@@ -29,13 +30,13 @@ const isRunning = computed(() => taskProgress.status === 'running');
         <span :style="{ width: progressPercent + '%' }"></span>
       </div>
       <div class="task-progress-stats">
-        <span>进度 {{ taskProgress.current }} / {{ taskProgress.total }}</span>
-        <span>成功 {{ taskProgress.success }}</span>
-        <span>失败 {{ taskProgress.failed }}</span>
+        <span>{{ t('dlg.task.progress', { current: taskProgress.current, total: taskProgress.total }) }}</span>
+        <span>{{ t('dlg.task.successCount', { count: taskProgress.success }) }}</span>
+        <span>{{ t('dlg.task.failedCount', { count: taskProgress.failed }) }}</span>
       </div>
-      <p v-if="isRunning" class="task-progress-warning">任务在后台执行，关闭窗口不会中断进度。</p>
+      <p v-if="isRunning" class="task-progress-warning">{{ t('dlg.task.backgroundHint') }}</p>
       <div v-else class="dialog-actions">
-        <button class="primary" type="button" @click="closeTaskProgress">关闭</button>
+        <button class="primary" type="button" @click="closeTaskProgress">{{ t('common.close') }}</button>
       </div>
     </section>
   </div>

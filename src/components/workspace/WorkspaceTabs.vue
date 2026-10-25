@@ -2,6 +2,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ArrowRightLeft, Cloud, DownloadCloud, FolderUp, History, Info, Settings } from 'lucide-vue-next';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import { t } from '../../i18n';
 
 type WorkspaceTab = 'convert' | 'localUpload' | 'download' | 'configs' | 'records' | 'cloudSync' | 'about';
 
@@ -73,25 +74,25 @@ onBeforeUnmount(() => {
   <nav ref="tabsRef" class="tabs">
     <span class="tabs-indicator" :style="tabsIndicatorStyle" aria-hidden="true"></span>
     <button :ref="el => setTabButtonRef('convert', el)" :class="{ active: activeTab === 'convert' }" @click="handleTabClick('convert')">
-      <ArrowRightLeft :size="18" />批量转换
+      <ArrowRightLeft :size="18" />{{ t('tab.convert') }}
     </button>
     <button :ref="el => setTabButtonRef('localUpload', el)" :class="{ active: activeTab === 'localUpload' }" @click="handleTabClick('localUpload')">
-      <FolderUp :size="18" />本地上传
+      <FolderUp :size="18" />{{ t('tab.localUpload') }}
     </button>
     <button :ref="el => setTabButtonRef('download', el)" :class="{ active: activeTab === 'download' }" @click="handleTabClick('download')">
-      <DownloadCloud :size="18" />下载图片
+      <DownloadCloud :size="18" />{{ t('tab.download') }}
     </button>
     <button :ref="el => setTabButtonRef('configs', el)" :class="{ active: activeTab === 'configs' }" @click="handleTabClick('configs')">
-      <Settings :size="18" />图床配置
+      <Settings :size="18" />{{ t('tab.configs') }}
     </button>
     <button :ref="el => setTabButtonRef('records', el)" :class="{ active: activeTab === 'records' }" @click="handleTabClick('records')">
-      <History :size="18" />历史记录
+      <History :size="18" />{{ t('tab.records') }}
     </button>
     <button :ref="el => setTabButtonRef('cloudSync', el)" :class="{ active: activeTab === 'cloudSync' }" @click="handleTabClick('cloudSync')">
-      <Cloud :size="18" />云同步
+      <Cloud :size="18" />{{ t('tab.cloudSync') }}
     </button>
     <button :ref="el => setTabButtonRef('about', el)" :class="{ active: activeTab === 'about' }" @click="handleTabClick('about')">
-      <Info :size="18" />关于
+      <Info :size="18" />{{ t('tab.about') }}
     </button>
   </nav>
 </template>

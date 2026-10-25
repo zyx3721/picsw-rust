@@ -2,6 +2,7 @@
 import { KeyRound, X } from 'lucide-vue-next';
 import { computed, ref, watch } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import { t } from '../../i18n';
 
 const props = defineProps<{ open: boolean }>();
 
@@ -40,30 +41,28 @@ async function handleSubmit() {
   <div v-if="open" class="modal-backdrop" role="presentation" @click.self="closePasswordModal">
     <section class="confirm-dialog sync-password-dialog" role="dialog" aria-modal="true" aria-labelledby="sync-password-title">
       <div class="sync-dialog-head">
-        <h2 id="sync-password-title"><KeyRound :size="20" />{{ isChange ? '修改同步密码' : '设置同步密码' }}</h2>
-        <button class="ghost icon-only" type="button" aria-label="关闭" @click="closePasswordModal"><X :size="18" /></button>
+        <h2 id="sync-password-title"><KeyRound :size="20" />{{ isChange ? t('dlg.syncPwd.changeTitle') : t('dlg.syncPwd.setTitle') }}</h2>
+        <button class="ghost icon-only" type="button" :aria-label="t('common.close')" @click="closePasswordModal"><X :size="18" /></button>
       </div>
       <label v-if="isChange" class="sync-dialog-field">
-        <span>当前密码</span>
-        <input v-model="oldPassword" type="password" placeholder="输入当前同步密码" spellcheck="false" autocomplete="off" @keyup.enter="handleSubmit" />
+        <span>{{ t('dlg.syncPwd.currentLabel') }}</span>
+        <input v-model="oldPassword" type="password" :placeholder="t('dlg.syncPwd.currentPlaceholder')" spellcheck="false" autocomplete="off" @keyup.enter="handleSubmit" />
       </label>
       <label class="sync-dialog-field">
-        <span>{{ isChange ? '新密码（至少 6 位）' : '同步密码（至少 6 位）' }}</span>
-        <input v-model="password" type="password" placeholder="输入同步密码" spellcheck="false" autocomplete="new-password" @keyup.enter="handleSubmit" />
+        <span>{{ isChange ? t('dlg.syncPwd.newChangeLabel') : t('dlg.syncPwd.newSetLabel') }}</span>
+        <input v-model="password" type="password" :placeholder="t('dlg.syncPwd.newPlaceholder')" spellcheck="false" autocomplete="new-password" @keyup.enter="handleSubmit" />
       </label>
       <label class="sync-dialog-field">
-        <span>确认密码</span>
-        <input v-model="confirmPassword" type="password" placeholder="再次输入同步密码" spellcheck="false" autocomplete="new-password" @keyup.enter="handleSubmit" />
+        <span>{{ t('dlg.syncPwd.confirmLabel') }}</span>
+        <input v-model="confirmPassword" type="password" :placeholder="t('dlg.syncPwd.confirmPlaceholder')" spellcheck="false" autocomplete="new-password" @keyup.enter="handleSubmit" />
       </label>
       <p v-if="error" class="sync-dialog-error">{{ error }}</p>
-      <p v-else-if="confirmPassword.length > 0 && password !== confirmPassword" class="sync-dialog-error">两次输入的密码不一致</p>
-      <div class="sync-dialog-note">
-        云端只存密文（AES-256-GCM + PBKDF2）。密码不做任何保存——多台设备须使用相同密码；遗忘后云端数据将无法解密，只能删除同步 Gist 重来。
-      </div>
+      <p v-else-if="confirmPassword.length > 0 && password !== confirmPassword" class="sync-dialog-error">{{ t('dlg.syncPwd.mismatch') }}</p>
+      <div class="sync-dialog-note">{{ t('dlg.syncPwd.note') }}</div>
       <div class="dialog-actions">
-        <button class="ghost" type="button" @click="closePasswordModal">取消</button>
+        <button class="ghost" type="button" @click="closePasswordModal">{{ t('common.cancel') }}</button>
         <button class="primary" type="button" :disabled="!canSubmit" @click="handleSubmit">
-          {{ isChange ? '修改' : '设置' }}
+          {{ isChange ? t('dlg.syncPwd.submitChange') : t('dlg.syncPwd.submitSet') }}
         </button>
       </div>
     </section>

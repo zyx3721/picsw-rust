@@ -2,6 +2,7 @@
 import { ChevronDown, Eye, EyeOff, KeyRound, PlugZap, Plus, RefreshCw, Trash2 } from 'lucide-vue-next';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import { t } from '../../i18n';
 
 const {
   loading,
@@ -12,6 +13,7 @@ const {
   supportedTypes,
   selectedFields,
   typeLabel,
+  typeDescription,
   fieldLabel,
   fieldPlaceholder,
   secretFieldVisible,
@@ -51,13 +53,13 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeMinioSslD
     <div class="section-title">
       <div>
         <p class="section-kicker">Credentials</p>
-        <h2>{{ configForm.id ? '编辑图床配置' : '新增图床配置' }}</h2>
+        <h2>{{ configForm.id ? t('config.editTitle') : t('config.addTitle') }}</h2>
       </div>
-      <span class="secure-badge"><KeyRound :size="16" /> 按类型校验</span>
+      <span class="secure-badge"><KeyRound :size="16" /> {{ t('config.typeValidated') }}</span>
     </div>
     <div class="field-row">
       <label class="select-field config-type-field">
-        <span>图床类型</span>
+        <span>{{ t('config.typeLabel') }}</span>
         <div class="custom-select" :class="{ open: configTypeDropdownOpen }">
           <button
             class="select-trigger"
@@ -78,23 +80,23 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeMinioSslD
               @click="selectConfigType(item.value)"
             >
               <span>{{ typeLabel(item.value) }}</span>
-              <small>{{ item.description }}</small>
+              <small>{{ typeDescription(item.value) }}</small>
             </button>
           </div>
         </div>
       </label>
       <label
-        >图床类型<select v-model="configForm.picbed_type" @change="handleConfigTypeChange">
+        >{{ t('config.typeLabel') }}<select v-model="configForm.picbed_type" @change="handleConfigTypeChange">
           <option v-for="item in supportedTypes" :key="item.value" :value="item.value">
             {{ typeLabel(item.value) }}
           </option>
         </select></label
       ><label :class="{ invalid: configErrors.config_name }"
-        ><span class="field-label-text">配置名称</span
+        ><span class="field-label-text">{{ t('config.nameLabel') }}</span
         ><input
           v-model.trim="configForm.config_name"
           :class="{ invalid: configErrors.config_name }"
-          placeholder="生产图床配置"
+          :placeholder="t('config.namePlaceholder')"
           @input="configErrors.config_name = ''"
       /></label>
     </div>
@@ -144,7 +146,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeMinioSslD
             v-if="field.secret"
             class="secret-toggle"
             type="button"
-            :aria-label="secretFieldVisible(field.key) ? '隐藏密钥' : '显示密钥'"
+            :aria-label="secretFieldVisible(field.key) ? t('config.hideSecretAria') : t('config.showSecretAria')"
             @click="toggleSecretField(field.key)"
           >
             <EyeOff v-if="secretFieldVisible(field.key)" :size="18" />
@@ -153,15 +155,15 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeMinioSslD
         </div></label>
     </div>
     <label class="checkbox"
-      ><input v-model="configForm.is_default" type="checkbox" />设为默认配置</label
+      ><input v-model="configForm.is_default" type="checkbox" />{{ t('config.setAsDefault') }}</label
     >
     <div class="actions">
       <button class="secondary" type="button" @click="resetConfigForm">
-        <RefreshCw :size="18" />清空</button
+        <RefreshCw :size="18" />{{ t('common.clear') }}</button
       ><button class="secondary" type="button" :disabled="loading" @click="testConfig()">
-        <PlugZap :size="18" />测试配置</button
+        <PlugZap :size="18" />{{ t('config.test') }}</button
       ><button class="primary" :disabled="loading" type="submit">
-        <Plus :size="18" />保存配置
+        <Plus :size="18" />{{ t('config.save') }}
       </button>
     </div>
   </form>
@@ -169,7 +171,7 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeMinioSslD
     <div class="section-title">
       <div>
         <p class="section-kicker">Saved</p>
-        <h2>已保存配置</h2>
+        <h2>{{ t('config.savedTitle') }}</h2>
       </div>
       <span class="count-badge">{{ configs.length }}</span>
     </div>
@@ -183,24 +185,24 @@ onBeforeUnmount(() => document.removeEventListener('pointerdown', closeMinioSslD
         <div>
           <strong>{{ item.config_name }}</strong
           ><span
-            >{{ typeLabel(item.picbed_type) }}{{ item.is_default ? ' · 默认' : '' }}</span
+            >{{ typeLabel(item.picbed_type) }}{{ item.is_default ? t('common.defaultSuffix') : '' }}</span
           >
         </div>
         <div class="row-actions">
-          <button class="ghost" type="button" @click="editConfig(item)">编辑</button
-          ><button class="ghost" type="button" :disabled="loading" @click="testConfig(item)">测试</button
-          ><button class="ghost" type="button" @click="setDefault(item.id)">默认</button
+          <button class="ghost" type="button" @click="editConfig(item)">{{ t('config.edit') }}</button
+          ><button class="ghost" type="button" :disabled="loading" @click="testConfig(item)">{{ t('config.testShort') }}</button
+          ><button class="ghost" type="button" @click="setDefault(item.id)">{{ t('config.defaultShort') }}</button
           ><button
             class="danger icon-only"
             type="button"
-            aria-label="删除配置"
+            :aria-label="t('config.deleteAria')"
             @click="requestDeleteConfig(item)"
           >
             <Trash2 :size="17" />
           </button>
         </div>
       </div>
-      <p v-if="configs.length === 0" class="empty">暂无图床配置</p>
+      <p v-if="configs.length === 0" class="empty">{{ t('config.empty') }}</p>
     </div>
   </div>
 </section>

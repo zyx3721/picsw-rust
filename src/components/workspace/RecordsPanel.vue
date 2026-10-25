@@ -6,6 +6,7 @@ import { openUrl } from '@tauri-apps/plugin-opener';
 import { ChevronDown, Download, FileText, RefreshCw, Search, Trash2, X } from 'lucide-vue-next';
 import DateRangePanel from '../DateRangePanel.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import { t } from '../../i18n';
 
 const { records, recordDetail, recordDetailOpen, typeLabel, showMessage, showError, loadRecords, openRecordDetail, closeRecordDetail, deleteRecords } = useWorkspaceContext();
 const selectedRecordIds = ref<number[]>([]);
@@ -58,7 +59,7 @@ const filteredRecords = computed(() => {
       record.original_filename,
       typeLabel(record.source_picbed),
       typeLabel(record.target_picbed),
-      record.status === 'success' ? '成功' : '失败',
+      record.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed'),
       record.status,
       String(record.image_count),
       new Date(record.created_at).toLocaleString(),
@@ -74,20 +75,31 @@ const allRecordsSelected = computed(
   () => visibleRecordIds.value.size > 0 && filteredRecords.value.every(record => selectedRecordIds.value.includes(record.id))
 );
 
-const statusFilterLabel = computed(() => (statusFilter.value === 'success' ? '成功' : statusFilter.value === 'failed' ? '失败' : '全部状态'));
-const sourceFilterLabel = computed(() => (sourceFilter.value ? typeLabel(sourceFilter.value) : '全部源图床'));
-const targetFilterLabel = computed(() => (targetFilter.value ? typeLabel(targetFilter.value) : '全部目标图床'));
+const statusFilterLabel = computed(() =>
+  statusFilter.value === 'success'
+    ? t('records.statusSuccess')
+    : statusFilter.value === 'failed'
+      ? t('records.statusFailed')
+      : t('records.allStatus')
+);
+const sourceFilterLabel = computed(() => (sourceFilter.value ? typeLabel(sourceFilter.value) : t('records.allSources')));
+const targetFilterLabel = computed(() => (targetFilter.value ? typeLabel(targetFilter.value) : t('records.allTargets')));
 const timeRangeLabel = computed(() => {
   if (timeRangeFilter.value === 'custom') {
     const range = appliedCustomRange.value;
-    return range ? `${range.start} 至 ${range.end}` : '自定义';
+    return range ? t('records.rangeTo', { start: range.start, end: range.end }) : t('records.custom');
   }
-  return ({ today: '今天', '7d': '近 7 天', '30d': '近 30 天' })[timeRangeFilter.value] || '全部时间';
+  return (
+    {
+      today: t('records.today'),
+      '7d': t('records.last7Days'),
+      '30d': t('records.last30Days'),
+    })[timeRangeFilter.value] || t('records.allTime');
 });
 const recordCountHint = computed(() =>
   filteredRecords.value.length === records.value.length
-    ? `共 ${records.value.length} 条`
-    : `${filteredRecords.value.length} / ${records.value.length} 条`
+    ? t('records.totalCount', { count: records.value.length })
+    : t('records.filteredCount', { filtered: filteredRecords.value.length, total: records.value.length })
 );
 
 function toggleFilterDropdown(name: RecordFilterName) {
@@ -176,9 +188,9 @@ async function downloadRecordContent() {
   if (!targetPath) return;
   try {
     await invoke('write_text_file', { path: targetPath, content });
-    showMessage('转换结果已保存');
+    showMessage(t('records.convertedSaved'));
   } catch (err) {
-    showError(err instanceof Error ? err.message : '保存转换结果失败');
+    showError(err instanceof Error ? err.message : t('records.saveFailed'));
   }
 }
 
@@ -222,8 +234,8 @@ async function openExternalUrl(url: string) {
   try {
     await openUrl(url);
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err || '未知错误');
-    showError(`打开浏览器失败：${reason}`);
+    const reason = err instanceof Error ? err.message : String(err || t('common.unknown'));
+    showError(t('records.openBrowserFailed', { reason }));
   }
 }
 
@@ -237,28 +249,28 @@ function hideUrlTooltip() {
   <div class="section-title">
     <div>
       <p class="section-kicker">Timeline</p>
-      <h2>转换历史<span class="record-count-hint">{{ recordCountHint }}</span></h2>
+      <h2>{{ t('records.title') }}<span class="record-count-hint">{{ recordCountHint }}</span></h2>
     </div>
     <div class="record-toolbar-actions">
       <div class="record-search">
         <Search :size="16" />
-        <input v-model="recordSearch" type="search" placeholder="搜索转换历史记录" aria-label="搜索转换历史记录" />
+        <input v-model="recordSearch" type="search" :placeholder="t('records.searchPlaceholder')" :aria-label="t('records.searchPlaceholder')" />
       </div>
       <div class="record-filter status-filter custom-select" :class="{ open: openFilterDropdown === 'status' }">
         <button
           class="select-trigger"
           type="button"
           :aria-expanded="openFilterDropdown === 'status'"
-          aria-label="按状态筛选"
+          :aria-label="t('records.statusFilterAria')"
           @click="toggleFilterDropdown('status')"
         >
           <span>{{ statusFilterLabel }}</span>
           <ChevronDown :size="16" class="select-chevron" />
         </button>
         <div v-if="openFilterDropdown === 'status'" class="select-menu">
-          <button class="select-option" :class="{ selected: !statusFilter }" type="button" @click="statusFilter = ''; closeFilterDropdowns()">全部状态</button>
-          <button class="select-option" :class="{ selected: statusFilter === 'success' }" type="button" @click="statusFilter = 'success'; closeFilterDropdowns()">成功</button>
-          <button class="select-option" :class="{ selected: statusFilter === 'failed' }" type="button" @click="statusFilter = 'failed'; closeFilterDropdowns()">失败</button>
+          <button class="select-option" :class="{ selected: !statusFilter }" type="button" @click="statusFilter = ''; closeFilterDropdowns()">{{ t('records.allStatus') }}</button>
+          <button class="select-option" :class="{ selected: statusFilter === 'success' }" type="button" @click="statusFilter = 'success'; closeFilterDropdowns()">{{ t('records.statusSuccess') }}</button>
+          <button class="select-option" :class="{ selected: statusFilter === 'failed' }" type="button" @click="statusFilter = 'failed'; closeFilterDropdowns()">{{ t('records.statusFailed') }}</button>
         </div>
       </div>
       <div class="record-filter custom-select" :class="{ open: openFilterDropdown === 'source' }">
@@ -266,14 +278,14 @@ function hideUrlTooltip() {
           class="select-trigger"
           type="button"
           :aria-expanded="openFilterDropdown === 'source'"
-          aria-label="按源图床筛选"
+          :aria-label="t('records.sourceFilterAria')"
           @click="toggleFilterDropdown('source')"
         >
           <span>{{ sourceFilterLabel }}</span>
           <ChevronDown :size="16" class="select-chevron" />
         </button>
         <div v-if="openFilterDropdown === 'source'" class="select-menu">
-          <button class="select-option" :class="{ selected: !sourceFilter }" type="button" @click="sourceFilter = ''; closeFilterDropdowns()">全部源图床</button>
+          <button class="select-option" :class="{ selected: !sourceFilter }" type="button" @click="sourceFilter = ''; closeFilterDropdowns()">{{ t('records.allSources') }}</button>
           <button
             v-for="item in sourceOptions"
             :key="item"
@@ -289,14 +301,14 @@ function hideUrlTooltip() {
           class="select-trigger"
           type="button"
           :aria-expanded="openFilterDropdown === 'target'"
-          aria-label="按目标图床筛选"
+          :aria-label="t('records.targetFilterAria')"
           @click="toggleFilterDropdown('target')"
         >
           <span>{{ targetFilterLabel }}</span>
           <ChevronDown :size="16" class="select-chevron" />
         </button>
         <div v-if="openFilterDropdown === 'target'" class="select-menu">
-          <button class="select-option" :class="{ selected: !targetFilter }" type="button" @click="targetFilter = ''; closeFilterDropdowns()">全部目标图床</button>
+          <button class="select-option" :class="{ selected: !targetFilter }" type="button" @click="targetFilter = ''; closeFilterDropdowns()">{{ t('records.allTargets') }}</button>
           <button
             v-for="item in targetOptions"
             :key="item"
@@ -312,18 +324,18 @@ function hideUrlTooltip() {
           class="select-trigger"
           type="button"
           :aria-expanded="openFilterDropdown === 'time'"
-          aria-label="按时间范围筛选"
+          :aria-label="t('records.timeFilterAria')"
           @click="toggleFilterDropdown('time')"
         >
           <span>{{ timeRangeLabel }}</span>
           <ChevronDown :size="16" class="select-chevron" />
         </button>
         <div v-if="openFilterDropdown === 'time'" class="select-menu">
-          <button class="select-option" :class="{ selected: !timeRangeFilter }" type="button" @click="timeRangeFilter = ''; closeFilterDropdowns()">全部时间</button>
-          <button class="select-option" :class="{ selected: timeRangeFilter === 'today' }" type="button" @click="timeRangeFilter = 'today'; closeFilterDropdowns()">今天</button>
-          <button class="select-option" :class="{ selected: timeRangeFilter === '7d' }" type="button" @click="timeRangeFilter = '7d'; closeFilterDropdowns()">近 7 天</button>
-          <button class="select-option" :class="{ selected: timeRangeFilter === '30d' }" type="button" @click="timeRangeFilter = '30d'; closeFilterDropdowns()">近 30 天</button>
-          <button class="select-option" :class="{ selected: timeRangeFilter === 'custom' }" type="button" @click="pickCustomRange">自定义</button>
+          <button class="select-option" :class="{ selected: !timeRangeFilter }" type="button" @click="timeRangeFilter = ''; closeFilterDropdowns()">{{ t('records.allTime') }}</button>
+          <button class="select-option" :class="{ selected: timeRangeFilter === 'today' }" type="button" @click="timeRangeFilter = 'today'; closeFilterDropdowns()">{{ t('records.today') }}</button>
+          <button class="select-option" :class="{ selected: timeRangeFilter === '7d' }" type="button" @click="timeRangeFilter = '7d'; closeFilterDropdowns()">{{ t('records.last7Days') }}</button>
+          <button class="select-option" :class="{ selected: timeRangeFilter === '30d' }" type="button" @click="timeRangeFilter = '30d'; closeFilterDropdowns()">{{ t('records.last30Days') }}</button>
+          <button class="select-option" :class="{ selected: timeRangeFilter === 'custom' }" type="button" @click="pickCustomRange">{{ t('records.custom') }}</button>
         </div>
         <DateRangePanel
           v-if="showCustomRange"
@@ -333,10 +345,10 @@ function hideUrlTooltip() {
         />
       </div>
       <button class="secondary" type="button" @click="loadRecords">
-        <RefreshCw :size="18" />刷新
+        <RefreshCw :size="18" />{{ t('records.refresh') }}
       </button>
       <button class="danger" type="button" :disabled="deletingRecords || selectedRecordCount === 0" @click="deleteSelectedRecords">
-        <Trash2 :size="18" />删除<span v-if="selectedRecordCount"> {{ selectedRecordCount }}</span>
+        <Trash2 :size="18" />{{ t('records.delete') }}<span v-if="selectedRecordCount"> {{ selectedRecordCount }}</span>
       </button>
     </div>
   </div>
@@ -345,7 +357,7 @@ function hideUrlTooltip() {
       <thead>
         <tr>
           <th class="record-select-col">
-            <label class="record-select-check" aria-label="全选历史记录">
+            <label class="record-select-check" :aria-label="t('records.selectAllAria')">
               <input
                 type="checkbox"
                 :checked="allRecordsSelected"
@@ -354,18 +366,18 @@ function hideUrlTooltip() {
               />
             </label>
           </th>
-          <th>文件</th>
-          <th>源图床</th>
-          <th>目标图床</th>
-          <th>状态</th>
-          <th>图片数</th>
-          <th>时间</th>
+          <th>{{ t('records.colFile') }}</th>
+          <th>{{ t('records.colSource') }}</th>
+          <th>{{ t('records.colTarget') }}</th>
+          <th>{{ t('records.colStatus') }}</th>
+          <th>{{ t('records.colImages') }}</th>
+          <th>{{ t('records.colTime') }}</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="record in filteredRecords" :key="record.id" class="clickable-row" @click="openRecordDetail(record)">
           <td class="record-select-col" @click.stop>
-            <label class="record-select-check" :aria-label="`选择 ${record.original_filename}`">
+            <label class="record-select-check" :aria-label="t('records.selectAria', { name: record.original_filename })">
               <input
                 type="checkbox"
                 :checked="selectedRecordIds.includes(record.id)"
@@ -378,7 +390,7 @@ function hideUrlTooltip() {
           <td>{{ typeLabel(record.target_picbed) }}</td>
           <td>
             <span :class="['status', record.status]">{{
-              record.status === 'success' ? '成功' : '失败'
+              record.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed')
             }}</span>
           </td>
           <td>{{ record.image_count }}</td>
@@ -387,8 +399,8 @@ function hideUrlTooltip() {
       </tbody>
     </table>
   </div>
-  <p v-if="records.length === 0" class="empty">暂无转换记录</p>
-  <p v-else-if="filteredRecords.length === 0" class="empty">无匹配“{{ recordSearch.trim() }}”的记录</p>
+  <p v-if="records.length === 0" class="empty">{{ t('records.empty') }}</p>
+  <p v-else-if="filteredRecords.length === 0" class="empty">{{ t('records.noMatch', { keyword: recordSearch.trim() }) }}</p>
 </section>
 
 <div v-if="recordDetailOpen && recordDetail" class="modal-backdrop" role="presentation" @click.self="closeRecordDetail">
@@ -401,24 +413,24 @@ function hideUrlTooltip() {
           <h2>{{ recordDetail.original_filename }}</h2>
         </div>
       </div>
-      <button class="ghost icon-only" type="button" aria-label="关闭详情" @click="closeRecordDetail"><X :size="18" /></button>
+      <button class="ghost icon-only" type="button" :aria-label="t('records.detailCloseAria')" @click="closeRecordDetail"><X :size="18" /></button>
     </header>
 
     <div class="record-detail-summary">
       <div class="record-stat">
-        <span>源图床</span>
+        <span>{{ t('records.colSource') }}</span>
         <strong>{{ typeLabel(recordDetail.source_picbed) }}</strong>
       </div>
       <div class="record-stat">
-        <span>目标图床</span>
+        <span>{{ t('records.colTarget') }}</span>
         <strong>{{ typeLabel(recordDetail.target_picbed) }}</strong>
       </div>
       <div class="record-stat">
-        <span>状态</span>
-        <strong><span :class="['status', recordDetail.status]">{{ recordDetail.status === 'success' ? '成功' : '失败' }}</span></strong>
+        <span>{{ t('records.colStatus') }}</span>
+        <strong><span :class="['status', recordDetail.status]">{{ recordDetail.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed') }}</span></strong>
       </div>
       <div class="record-stat">
-        <span>图片数</span>
+        <span>{{ t('records.colImages') }}</span>
         <strong>{{ recordDetail.image_count }}</strong>
       </div>
     </div>
@@ -429,12 +441,12 @@ function hideUrlTooltip() {
       <div class="record-detail-section-head">
         <div>
           <p class="section-kicker">Images</p>
-          <h3>替换明细</h3>
+          <h3>{{ t('records.detailImages') }}</h3>
         </div>
         <div class="record-detail-head-actions">
-          <span>{{ recordDetail.details?.length || 0 }} 条</span>
+          <span>{{ t('records.detailCount', { count: recordDetail.details?.length || 0 }) }}</span>
           <button class="secondary" type="button" :disabled="!recordDetail.converted_content" @click="downloadRecordContent">
-            <Download :size="18" />下载转换结果
+            <Download :size="18" />{{ t('records.downloadConverted') }}
           </button>
         </div>
       </div>
@@ -442,10 +454,10 @@ function hideUrlTooltip() {
         <table class="record-detail-table">
           <thead>
             <tr>
-              <th>序号</th>
-              <th>源地址</th>
-              <th>目标地址</th>
-              <th>状态</th>
+              <th>{{ t('records.colIndex') }}</th>
+              <th>{{ t('records.colSourceUrl') }}</th>
+              <th>{{ t('records.colTargetUrl') }}</th>
+              <th>{{ t('records.colStatus') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -479,12 +491,12 @@ function hideUrlTooltip() {
                 </a>
                 <span v-else>-</span>
               </td>
-              <td><span :class="['status', detail.status]">{{ detail.status === 'success' ? '成功' : '失败' }}</span></td>
+              <td><span :class="['status', detail.status]">{{ detail.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed') }}</span></td>
             </tr>
           </tbody>
         </table>
       </div>
-      <p v-else class="empty record-detail-empty">暂无替换明细</p>
+      <p v-else class="empty record-detail-empty">{{ t('records.detailEmpty') }}</p>
     </section>
   </section>
   <div

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-vue-next';
+import { t } from '../i18n';
 
 const props = defineProps<{ initial?: { start: string; end: string } | null }>();
 const emit = defineEmits<{ apply: [{ start: string; end: string }]; clear: [] }>();
 
-const weekdays = ['一', '二', '三', '四', '五', '六', '日'];
+const weekdays = computed(() => t('date.weekdays').split(','));
 const anchorMonth = ref(props.initial ? monthAnchorOf(props.initial.start) : new Date());
 const pendingStart = ref(props.initial?.start || '');
 const pendingEnd = ref(props.initial?.end || '');
@@ -83,15 +84,15 @@ function clearSelection() {
 </script>
 
 <template>
-  <div class="date-range-panel" role="dialog" aria-label="选择日期范围">
+  <div class="date-range-panel" role="dialog" :aria-label="t('date.rangeAria')">
     <div class="date-range-months">
       <div class="date-range-month">
         <div class="date-range-month-head">
           <div class="date-range-nav">
-            <button type="button" aria-label="上一年" @click="shiftYear(-1)"><ChevronsLeft :size="14" /></button>
-            <button type="button" aria-label="上一个月" @click="shiftMonth(-1)"><ChevronLeft :size="14" /></button>
+            <button type="button" :aria-label="t('date.prevYear')" @click="shiftYear(-1)"><ChevronsLeft :size="14" /></button>
+            <button type="button" :aria-label="t('date.prevMonth')" @click="shiftMonth(-1)"><ChevronLeft :size="14" /></button>
           </div>
-          <span class="date-range-month-title">{{ leftMonth.getFullYear() }} 年 {{ leftMonth.getMonth() + 1 }} 月</span>
+          <span class="date-range-month-title">{{ t('date.monthLabel', { year: leftMonth.getFullYear(), month: leftMonth.getMonth() + 1 }) }}</span>
           <span class="date-range-nav-spacer"></span>
         </div>
         <div class="date-range-grid">
@@ -110,10 +111,10 @@ function clearSelection() {
       <div class="date-range-month">
         <div class="date-range-month-head">
           <span class="date-range-nav-spacer"></span>
-          <span class="date-range-month-title">{{ rightMonth.getFullYear() }} 年 {{ rightMonth.getMonth() + 1 }} 月</span>
+          <span class="date-range-month-title">{{ t('date.monthLabel', { year: rightMonth.getFullYear(), month: rightMonth.getMonth() + 1 }) }}</span>
           <div class="date-range-nav">
-            <button type="button" aria-label="下一个月" @click="shiftMonth(1)"><ChevronRight :size="14" /></button>
-            <button type="button" aria-label="下一年" @click="shiftYear(1)"><ChevronsRight :size="14" /></button>
+            <button type="button" :aria-label="t('date.nextMonth')" @click="shiftMonth(1)"><ChevronRight :size="14" /></button>
+            <button type="button" :aria-label="t('date.nextYear')" @click="shiftYear(1)"><ChevronsRight :size="14" /></button>
           </div>
         </div>
         <div class="date-range-grid">
@@ -130,8 +131,8 @@ function clearSelection() {
       </div>
     </div>
     <div class="date-range-footer">
-      <button class="ghost" type="button" @click="clearSelection">清空</button>
-      <button class="secondary" type="button" :disabled="!canApply" @click="applySelection">确定</button>
+      <button class="ghost" type="button" @click="clearSelection">{{ t('common.clear') }}</button>
+      <button class="secondary" type="button" :disabled="!canApply" @click="applySelection">{{ t('common.apply') }}</button>
     </div>
   </div>
 </template>

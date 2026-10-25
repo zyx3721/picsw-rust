@@ -12,6 +12,7 @@ import { useTaskProgress } from './workspace/taskProgress';
 import { createUpdateChecker } from './workspace/updateChecker';
 import { useWorkspaceData } from './workspace/workspaceData';
 import type { ConversionRecord, PicbedConfig, WorkspaceTab } from './workspace/types';
+import { t } from '../i18n';
 
 export function usePicbedWorkspace() {
   const activeTab = ref<WorkspaceTab>('convert');
@@ -29,6 +30,7 @@ export function usePicbedWorkspace() {
     supportedTypes,
     selectedFields,
     typeLabel,
+    typeDescription,
     fieldLabel,
     fieldPlaceholder,
     secretFieldVisible,
@@ -317,7 +319,7 @@ export function usePicbedWorkspace() {
       recordDetail.value = data.record;
       recordDetailOpen.value = true;
     } catch (err) {
-      showError(err instanceof Error ? err.message : '读取转换记录详情失败');
+      showError(err instanceof Error ? err.message : t('msg.records.detailFailed'));
     } finally {
       loading.value = false;
     }
@@ -337,10 +339,10 @@ export function usePicbedWorkspace() {
       });
       if (recordDetail.value && uniqueIds.includes(recordDetail.value.id)) closeRecordDetail();
       records.value = records.value.filter(record => !uniqueIds.includes(record.id));
-      showMessage(data.message || `已删除 ${uniqueIds.length} 条转换记录`);
+      showMessage(data.message || t('msg.records.deleted', { count: uniqueIds.length }));
       await loadRecords();
     } catch (err) {
-      showError(err instanceof Error ? err.message : '删除转换记录失败');
+      showError(err instanceof Error ? err.message : t('msg.records.deleteFailed'));
     } finally {
       loading.value = false;
     }
@@ -353,7 +355,7 @@ export function usePicbedWorkspace() {
         restoreLocalUploadWorkspace();
       })
       .catch(err => {
-        showError(err instanceof Error ? err.message : '初始化工作区失败');
+        showError(err instanceof Error ? err.message : t('msg.workspace.initFailed'));
       });
   });
   onBeforeUnmount(() => {
@@ -498,6 +500,7 @@ export function usePicbedWorkspace() {
     canUploadLocalBatch,
     successRecords,
     typeLabel,
+    typeDescription,
     fieldLabel,
     fieldPlaceholder,
     secretFieldVisible,

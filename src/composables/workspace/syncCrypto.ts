@@ -1,5 +1,6 @@
 /// 云同步载荷的 WebCrypto 加解密：PBKDF2-HMAC-SHA256(600k) 派生 AES-256-GCM 密钥，
 /// 字节布局与 Rust 加密层完全一致（存量云端密文可直接解密），解密走浏览器原生实现
+import { t } from '../../i18n';
 const PBKDF2_ITERATIONS = 600_000;
 /// 新加密对齐 dockpilot 使用 32 字节盐；解密不校验盐长，历史 16 字节盐密文同样可解
 const SALT_LENGTH = 32;
@@ -42,7 +43,7 @@ async function deriveAesKey(password: string, salt: Uint8Array): Promise<CryptoK
 export type PasswordSealed = { iv: string; salt: string; payload: string };
 
 export async function encryptWithPassword(plaintext: string, password: string): Promise<PasswordSealed> {
-  if (!password) throw new Error('同步密码不能为空');
+  if (!password) throw new Error(t('msg.crypto.needPassword'));
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const key = await deriveAesKey(password, salt);
@@ -59,7 +60,7 @@ export async function decryptWithPasswordParts(
   ivB64: string,
   saltB64: string,
 ): Promise<string> {
-  if (!password) throw new Error('同步密码不能为空');
+  if (!password) throw new Error(t('msg.crypto.needPassword'));
   try {
     const iv = base64ToBytes(ivB64);
     const salt = base64ToBytes(saltB64);
@@ -68,15 +69,15 @@ export async function decryptWithPasswordParts(
     const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: toArrayBuffer(iv) }, key, toArrayBuffer(sealed));
     return textDecoder.decode(plain);
   } catch {
-    throw new Error('同步密码不正确或云端数据已损坏');
+    throw new Error(t('msg.crypto.wrongOrCorrupt'));
   }
 }
 
 /// 旧内嵌格式：base64(salt + iv + 密文)，兼容分立式结构上线前的存量云端数据
 export async function decryptWithPasswordEmbedded(payload: string, password: string): Promise<string> {
-  if (!password) throw new Error('同步密码不能为空');
+  if (!password) throw new Error(t('msg.crypto.needPassword'));
   const raw = base64ToBytes(payload);
-  if (raw.length < SALT_LENGTH + IV_LENGTH) throw new Error('同步数据格式不正确');
+  if (raw.length < SALT_LENGTH + IV_LENGTH) throw new Error(t('msg.crypto.invalidFormat'));
   return decryptWithPasswordParts(
     bytesToBase64(raw.subarray(SALT_LENGTH + IV_LENGTH)),
     password,

@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { PicbedConfig, RemoteConfigPreview, SyncRemoteState } from './types';
 import { decryptWithPasswordEmbedded, decryptWithPasswordParts, encryptWithPassword } from './syncCrypto';
+import { t } from '../../i18n';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -137,10 +138,10 @@ function formatTime(ts: number) {
 
 function formatRelativeTime(ts: number) {
   const diff = Date.now() - ts;
-  if (diff < 60_000) return '刚刚';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
-  if (diff < 172_800_000) return '昨天';
+  if (diff < 60_000) return t('msg.justNow');
+  if (diff < 3_600_000) return t('msg.minutesAgo', { count: Math.floor(diff / 60_000) });
+  if (diff < 86_400_000) return t('msg.hoursAgo', { count: Math.floor(diff / 3_600_000) });
+  if (diff < 172_800_000) return t('msg.yesterday');
   const date = new Date(ts);
   return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
 }
@@ -208,7 +209,7 @@ export function useWorkspaceCloudSync({
     () => syncConnected.value && passwordStatus.value === 'unlocked'
   );
   const autoSyncToggleTitle = computed(() =>
-    autoSyncToggleEnabled.value ? '' : '需先连接 GitHub 并解锁同步密码'
+    autoSyncToggleEnabled.value ? '' : t('msg.sync.toggleDisabledTip')
   );
   /// 开关始终展示实际设置：未连接/未解锁时仅禁用点击，勾选状态不受影响
   const autoSyncDisplayChecked = computed(() => autoSyncEnabled.value);
@@ -331,13 +332,13 @@ export function useWorkspaceCloudSync({
   const localConfigCount = computed(() => configs.value.length);
   /// 同步状态徽章：同步中 / 授权失效 / 冲突 / 阻塞 / 待恢复 / 就绪
   const syncStatusBadge = computed<SyncStatusBadge>(() => {
-    if (syncBusy.value) return { text: '同步中', kind: 'busy' };
-    if (syncConnected.value && syncTokenInvalid.value) return { text: '授权失效', kind: 'danger' };
-    if (syncBanner.value?.kind === 'conflict') return { text: '冲突', kind: 'danger' };
-    if (syncBanner.value?.kind === 'blocked') return { text: '已拦截', kind: 'danger' };
-    if (syncBanner.value?.kind === 'empty') return { text: '待恢复', kind: 'warn' };
-    if (!syncConnected.value) return { text: '就绪', kind: 'muted' };
-    return { text: '就绪', kind: 'ok' };
+    if (syncBusy.value) return { text: t('sync.badgeSyncing'), kind: 'busy' };
+    if (syncConnected.value && syncTokenInvalid.value) return { text: t('sync.badgeInvalid'), kind: 'danger' };
+    if (syncBanner.value?.kind === 'conflict') return { text: t('sync.badgeConflict'), kind: 'danger' };
+    if (syncBanner.value?.kind === 'blocked') return { text: t('sync.badgeBlocked'), kind: 'danger' };
+    if (syncBanner.value?.kind === 'empty') return { text: t('sync.badgeRestore'), kind: 'warn' };
+    if (!syncConnected.value) return { text: t('sync.badgeReady'), kind: 'muted' };
+    return { text: t('sync.badgeReady'), kind: 'ok' };
   });
   /// 云端版本徽章：显示上次成功同步的版本号，未同步过或已断开时不显示
   const remoteVersionBadge = computed(() => {
@@ -346,7 +347,7 @@ export function useWorkspaceCloudSync({
   });
   const lastSyncText = computed(() => {
     const at = lastSyncAt.value;
-    return at > 0 ? `上次同步: ${formatRelativeTime(at)}` : '上次同步: 从未同步';
+    return at > 0 ? t('sync.lastSyncAt', { when: formatRelativeTime(at) }) : t('sync.lastSyncAt', { when: t('sync.neverSynced') });
   });
   const passwordStatus = computed<SyncPasswordStatus>(() => {
     if (!passwordHintHash.value) return 'none';
@@ -374,16 +375,14 @@ export function useWorkspaceCloudSync({
         lastError = error;
       }
     }
-    const detail = lastError instanceof Error ? lastError.message : String(lastError || '未知错误');
-    throw new Error(
-      `GitHub API 请求失败: 网络异常（已自动重试 3 次）: ${detail}。可稍后重试；若本机需要代理访问 GitHub，请设置 HTTPS_PROXY 环境变量后重启应用`
-    );
+    const detail = lastError instanceof Error ? lastError.message : String(lastError || t('common.unknown'));
+    throw new Error(t('msg.sync.githubNetworkFailed', { detail }));
   }
 
   /// 携带令牌请求 GitHub API：401 视为令牌过期或被撤销（区别于网络抖动，重试无用），标记失效并暂停云同步
   async function githubFetch(path: string, init: RequestInit = {}) {
     if (!cachedToken) {
-      throw new Error('尚未连接 GitHub，请先完成授权');
+      throw new Error(t('msg.sync.notConnected'));
     }
     const response = await fetchWithRetry(path, {
       ...init,
@@ -399,9 +398,9 @@ export function useWorkspaceCloudSync({
       const detail = await response.text().catch(() => '');
       if (response.status === 401) {
         syncTokenInvalid.value = true;
-        throw new Error('GitHub 授权已过期或被撤销，请点「重新验证」重试，或重新连接 GitHub');
+        throw new Error(t('msg.sync.tokenExpired'));
       }
-      throw new Error(`GitHub API 请求失败（${response.status}）：${detail.slice(0, 160)}`);
+      throw new Error(t('msg.sync.githubApiFailed', { status: response.status, detail: detail.slice(0, 160) }));
     }
     if (response.status === 204) return null;
     return response.json();
@@ -420,7 +419,7 @@ export function useWorkspaceCloudSync({
     const file = full.files[GIST_FILENAME];
     let content = file?.content || '';
     if (!content || file.truncated) {
-      throw new Error('云端数据过大且被截断，暂不支持拉取');
+      throw new Error(t('msg.sync.vaultTooLarge'));
     }
     return { id: found.id, content };
   }
@@ -442,10 +441,10 @@ export function useWorkspaceCloudSync({
     try {
       vault = JSON.parse(content);
     } catch {
-      throw new Error('云端数据格式不正确');
+      throw new Error(t('msg.sync.vaultInvalid'));
     }
     if (!vault || typeof vault.payload !== 'string') {
-      throw new Error('云端数据格式不正确');
+      throw new Error(t('msg.sync.vaultInvalid'));
     }
     // 新结构信息在 meta 内（iv/salt 分立），旧结构字段在顶层且密文内嵌，两者兼容读取
     const meta = vault.meta || {};
@@ -464,7 +463,7 @@ export function useWorkspaceCloudSync({
   async function connectGithub() {
     const pat = syncPatInput.value.trim();
     if (!pat) {
-      showError('请先粘贴 GitHub 个人访问令牌（需要 gist 权限）');
+      showError(t('msg.sync.needPat'));
       return;
     }
     loadingStart();
@@ -475,7 +474,7 @@ export function useWorkspaceCloudSync({
       githubConnectOpen.value = false;
     } catch (error) {
       cachedToken = '';
-      showError(error instanceof Error ? error.message : '连接 GitHub 失败');
+      showError(error instanceof Error ? error.message : t('msg.sync.connectFailed'));
     } finally {
       loadingEnd();
     }
@@ -485,7 +484,7 @@ export function useWorkspaceCloudSync({
     cachedToken = token;
     const user = (await githubFetch('/user')) as { login?: string; name?: string | null };
     // 优先展示 GitHub 资料名（Name），未设置时回退用户名（login）
-    const displayName = (user.name || '').trim() || user.login || '未知账号';
+    const displayName = (user.name || '').trim() || user.login || t('msg.sync.unknownAccount');
     const backend = await invoke<string>('sync_save_credential', { plaintext: token });
     localStorage.setItem(SECRET_BACKEND_STORAGE_KEY, backend);
     localStorage.removeItem(TOKEN_STORAGE_KEY);
@@ -493,7 +492,7 @@ export function useWorkspaceCloudSync({
     secretBackend.value = backend;
     syncAccount.value = displayName;
     syncTokenInvalid.value = false;
-    showMessage(`已连接 GitHub 账号 ${displayName}`);
+    showMessage(t('msg.sync.connected', { account: displayName }));
     await refreshRemoteState();
     if (passwordStatus.value === 'unlocked') void syncNow(true);
   }
@@ -564,12 +563,12 @@ export function useWorkspaceCloudSync({
       }
       if (flowError === 'expired_token') {
         deviceFlowStatus.value = 'error';
-        deviceFlowError.value = '设备码已过期，请重新发起连接';
+        deviceFlowError.value = t('msg.sync.deviceCodeExpired');
         return;
       }
       if (flowError === 'access_denied') {
         deviceFlowStatus.value = 'error';
-        deviceFlowError.value = '授权被拒绝';
+        deviceFlowError.value = t('msg.sync.accessDenied');
         return;
       }
       if (typeof result.access_token === 'string') {
@@ -582,7 +581,7 @@ export function useWorkspaceCloudSync({
     }
     if (session === deviceFlowSession && deviceFlowStatus.value === 'pending') {
       deviceFlowStatus.value = 'error';
-      deviceFlowError.value = '连接已超时，请重新发起';
+      deviceFlowError.value = t('msg.sync.flowTimeout');
     }
   }
 
@@ -599,16 +598,16 @@ export function useWorkspaceCloudSync({
     try {
       await openUrl('https://github.com/login/device');
     } catch (error) {
-      showError(error instanceof Error ? error.message : '打开授权页失败，请手动访问 github.com/login/device');
+      showError(error instanceof Error ? error.message : t('msg.sync.openAuthPageFailed'));
     }
   }
 
   async function copyUserCode() {
     try {
       await navigator.clipboard.writeText(deviceFlowUserCode.value);
-      showMessage('设备码已复制');
+      showMessage(t('msg.sync.codeCopied'));
     } catch {
-      showError('复制失败，请手动选择设备码复制');
+      showError(t('msg.sync.copyFailed'));
     }
   }
 
@@ -637,7 +636,7 @@ export function useWorkspaceCloudSync({
     lastSyncAt.value = 0;
     lastSyncVersion.value = 0;
     localStorage.removeItem(LAST_SYNC_STORAGE_KEY);
-    showMessage('已断开 GitHub 连接');
+    showMessage(t('msg.sync.disconnected'));
   }
 
   function openPasswordModal(mode: 'set' | 'change') {
@@ -706,14 +705,14 @@ export function useWorkspaceCloudSync({
   function lockSyncPassword(): void {
     syncPassword.value = '';
     void forgetStoredPassword();
-    showMessage('已锁定并清除记住的同步密码');
+    showMessage(t('msg.sync.passwordLockedMessage'));
   }
 
   /// 行内解锁：锁定态直接在同步密码行输入解锁，不再弹窗；
   /// 校验通过后记住密码到本机密钥库，并立即同步一次对齐云端
   function unlockWithPassword(password: string): string | null {
     if (sha256HexSync(password) !== passwordHintHash.value) {
-      return '同步密码不正确';
+      return t('msg.sync.passwordWrong');
     }
     syncPassword.value = password;
     void rememberSyncPassword(password);
@@ -729,7 +728,7 @@ export function useWorkspaceCloudSync({
     password: string,
   ): Promise<string | null> {
     if (mode === 'change' && sha256HexSync(oldPassword) !== passwordHintHash.value) {
-      return '当前密码不正确';
+      return t('msg.sync.currentPasswordWrong');
     }
     syncPassword.value = password;
     passwordHintHash.value = sha256HexSync(password);
@@ -738,10 +737,10 @@ export function useWorkspaceCloudSync({
     passwordModalOpen.value = false;
     if (mode === 'set') {
       if (syncConnected.value) void syncNow();
-      showMessage('同步密码已配置');
+      showMessage(t('msg.sync.passwordSet'));
       return null;
     }
-    showMessage('同步密码已修改，云端数据将在下次配置变更同步时将以新密码加密');
+    showMessage(t('msg.sync.passwordChanged'));
     return null;
   }
 
@@ -820,7 +819,7 @@ export function useWorkspaceCloudSync({
     cachedToken = token;
     try {
       const user = (await githubFetch('/user')) as { login?: string; name?: string | null };
-      syncAccount.value = (user.name || '').trim() || user.login || '已连接';
+      syncAccount.value = (user.name || '').trim() || user.login || t('sync.connectedTag');
       localStorage.setItem(ACCOUNT_STORAGE_KEY, syncAccount.value);
     } catch {
       return;
@@ -833,25 +832,25 @@ export function useWorkspaceCloudSync({
     if (syncBusy.value) return;
     if (!cachedToken) await restoreConnection();
     if (!cachedToken) {
-      showError('本机没有可用的 GitHub 令牌，请重新连接');
+      showError(t('msg.sync.noLocalToken'));
       return;
     }
     loadingStart();
     let verified = false;
     try {
       const user = (await githubFetch('/user')) as { login?: string; name?: string | null };
-      syncAccount.value = (user.name || '').trim() || user.login || syncAccount.value || '已连接';
+      syncAccount.value = (user.name || '').trim() || user.login || syncAccount.value || t('sync.connectedTag');
       localStorage.setItem(ACCOUNT_STORAGE_KEY, syncAccount.value);
       syncTokenInvalid.value = false;
       verified = true;
     } catch (error) {
-      showError(error instanceof Error ? error.message : '重新验证失败');
+      showError(error instanceof Error ? error.message : t('msg.sync.revalidateFailed'));
     } finally {
       loadingEnd();
     }
     if (!verified) return;
     await refreshRemoteState();
-    showMessage('GitHub 授权有效，云同步已恢复');
+    showMessage(t('msg.sync.revalidated'));
     if (passwordStatus.value === 'unlocked') void syncNow(true);
   }
 
@@ -942,7 +941,7 @@ export function useWorkspaceCloudSync({
   async function syncNow(quiet = false) {
     if (!canSyncNow.value) return;
     if (unauthorized()) {
-      if (!quiet) showError('本机 GitHub 令牌不可用，请重新连接或点「重新验证」');
+      if (!quiet) showError(t('msg.sync.tokenUnavailable'));
       return;
     }
     loadingStart();
@@ -958,7 +957,7 @@ export function useWorkspaceCloudSync({
       if (!gist) {
         localStorage.removeItem(GIST_ID_STORAGE_KEY);
         if (localItems.length === 0) {
-          if (!quiet) showMessage('本地与云端都没有图床配置，无需同步');
+          if (!quiet) showMessage(t('msg.sync.nothingToSync'));
           return;
         }
         const vault = await uploadPayload(localItems, 1);
@@ -966,7 +965,7 @@ export function useWorkspaceCloudSync({
         await saveAnchor({ signature: await sha256Hex(vault), version: 1, updatedAt: Date.now() });
         await commitLastSync(1);
         syncRemoteState.value = { version: 1, updatedAt: Date.now(), configCount: localItems.length };
-        showMessage(`云端为空，已上传本地 ${localItems.length} 个图床配置（版本 1）`);
+        showMessage(t('msg.sync.uploadedInitial', { count: localItems.length }));
         return;
       }
 
@@ -983,7 +982,7 @@ export function useWorkspaceCloudSync({
           if (!anchor) await saveAnchor({ signature, version: vault.version, updatedAt: vault.updatedAt });
           await commitLastSync(vault.version);
           syncRemoteState.value = { version: vault.version, updatedAt: Date.now(), configCount: localItems.length };
-          if (!quiet) showMessage('本地与云端已一致，无需同步');
+          if (!quiet) showMessage(t('msg.sync.alreadyInSync'));
           return;
         }
         // 收缩护栏：远端未变时本机大幅缩水（如误删）同样拦截，与合并路径口径一致
@@ -991,13 +990,13 @@ export function useWorkspaceCloudSync({
         if (baseMap.size > 0 && (lost >= 10 || (lost >= 2 && lost >= Math.ceil(baseMap.size * 0.3)))) {
           syncBanner.value = {
             kind: 'blocked',
-            message: '同步被拦截：本次推送会删除过多数据',
-            detail: `图床配置从 ${baseMap.size} 条减少到 ${localItems.length} 条（丢失 ${lost} 条）。可能是本机数据异常，为保护云端已拦截自动推送。`,
+            message: t('msg.sync.blockedTitle'),
+            detail: t('msg.sync.blockedDetail', { before: baseMap.size, after: localItems.length, lost }),
             remoteItems: [...baseMap.values()],
             remoteSignature: signature,
             remoteVersion: vault.version,
           };
-          showMessage('同步被拦截，请在横幅中选择恢复云端数据或强制推送');
+          showMessage(t('msg.sync.blockedNotice'));
           return;
         }
         const version = vault.version + 1;
@@ -1006,7 +1005,7 @@ export function useWorkspaceCloudSync({
         await saveAnchor({ signature: await sha256Hex(vaultContent), version, updatedAt: Date.now() });
         await commitLastSync(version);
         syncRemoteState.value = { version, updatedAt: Date.now(), configCount: localItems.length };
-        showMessage(`已上传本地 ${localItems.length} 个图床配置（版本 ${version}）`);
+        showMessage(t('msg.sync.uploadedVersion', { count: localItems.length, version }));
         return;
       }
 
@@ -1016,10 +1015,10 @@ export function useWorkspaceCloudSync({
         remoteItems = await decryptVaultConfigs(vault, syncPassword.value);
       } catch (decryptError) {
         const message = decryptError instanceof Error ? decryptError.message : String(decryptError);
-        if (message.includes('同步密码不正确')) {
+        if (message.includes(t('msg.sync.passwordWrong'))) {
           syncBanner.value = {
             kind: 'conflict',
-            message: '云端数据无法用当前同步密码解密',
+            message: t('msg.sync.decryptConflict'),
             remoteItems: [],
             remoteSignature: signature,
             remoteVersion: vault.version,
@@ -1029,7 +1028,7 @@ export function useWorkspaceCloudSync({
             localVersion: loadAnchor()?.version || 0,
             remoteDeviceName: vault.deviceName,
           };
-          showMessage('检测到密码冲突，请在横幅中选择处理方式');
+          showMessage(t('msg.sync.conflictNotice'));
           return;
         }
         throw decryptError;
@@ -1042,7 +1041,7 @@ export function useWorkspaceCloudSync({
         await saveAnchor({ signature, version: vault.version, updatedAt: vault.updatedAt });
         await commitLastSync(vault.version);
         syncRemoteState.value = { version: vault.version, updatedAt: vault.updatedAt, configCount: localItems.length };
-        if (!quiet) showMessage('本地与云端配置已一致');
+        if (!quiet) showMessage(t('msg.sync.remoteAdopted'));
         return;
       }
 
@@ -1050,12 +1049,12 @@ export function useWorkspaceCloudSync({
       if (baseMap.size === 0 && localItems.length === 0 && remoteItems.length > 0) {
         syncBanner.value = {
           kind: 'empty',
-          message: '发现云端备份',
+          message: t('msg.sync.foundBackup'),
           remoteItems,
           remoteSignature: signature,
           remoteVersion: vault.version,
         };
-        showMessage('本地没有配置而云端有数据，确认后可从云端恢复');
+        showMessage(t('msg.sync.emptyNotice'));
         return;
       }
 
@@ -1110,13 +1109,13 @@ export function useWorkspaceCloudSync({
       if (lost >= 10 || (lost >= 2 && lost >= Math.ceil(referenceCount * 0.3))) {
         syncBanner.value = {
           kind: 'blocked',
-          message: '同步被拦截：本次推送会删除过多数据',
-          detail: `图床配置从 ${referenceCount} 条减少到 ${merged.length} 条（丢失 ${lost} 条）。可能是本机数据异常，为保护云端已拦截自动推送。`,
+          message: t('msg.sync.blockedTitle'),
+          detail: t('msg.sync.blockedDetail', { before: referenceCount, after: merged.length, lost }),
           remoteItems,
           remoteSignature: signature,
           remoteVersion: vault.version,
         };
-        showMessage('同步被拦截，请在横幅中选择恢复云端数据或强制推送');
+        showMessage(t('msg.sync.blockedNotice'));
         return;
       }
 
@@ -1153,9 +1152,9 @@ export function useWorkspaceCloudSync({
         await saveAnchor({ signature, version: vault.version, updatedAt: vault.updatedAt });
         await commitLastSync(vault.version);
         syncRemoteState.value = { version: vault.version, updatedAt: vault.updatedAt, configCount: merged.length };
-        const parts = [`应用云端变更 ${applied} 项`];
-        if (deleted > 0) parts.push(`删除 ${deleted} 项`);
-        showMessage(`已采纳云端配置（${parts.join('，')}）`);
+        const parts = [t('msg.sync.appliedPart', { count: applied })];
+        if (deleted > 0) parts.push(t('msg.sync.deletedPart', { count: deleted }));
+        showMessage(t('msg.sync.adoptedChanges', { parts: parts.join(t('msg.partsJoiner')) }));
         return;
       }
 
@@ -1167,12 +1166,17 @@ export function useWorkspaceCloudSync({
       await commitLastSync(version);
       syncRemoteState.value = { version, updatedAt: Date.now(), configCount: merged.length };
 
-      const parts = [`应用云端变更 ${applied} 项`];
-      if (deleted > 0) parts.push(`删除本地 ${deleted} 项`);
-      const message = `同步完成：${parts.join('，')}，上传合并结果 ${merged.length} 个配置（版本 ${version}）${conflicts > 0 ? `；${conflicts} 处两侧均修改，以本地为准` : ''}`;
+      const parts = [t('msg.sync.appliedPart', { count: applied })];
+      if (deleted > 0) parts.push(t('msg.sync.deletedLocalPart', { count: deleted }));
+      const message = t('msg.sync.syncDone', {
+        parts: parts.join(t('msg.partsJoiner')),
+        count: merged.length,
+        version,
+        conflicts: conflicts > 0 ? t('msg.sync.conflictSuffix', { count: conflicts }) : '',
+      });
       showMessage(message);
     } catch (error) {
-      if (!quiet) showError(error instanceof Error ? error.message : '立即同步失败');
+      if (!quiet) showError(error instanceof Error ? error.message : t('msg.sync.syncFailed'));
     } finally {
       loadingEnd();
     }
@@ -1192,9 +1196,9 @@ export function useWorkspaceCloudSync({
       await commitLastSync(version);
       syncRemoteState.value = { version, updatedAt: Date.now(), configCount: items.length };
       syncBanner.value = null;
-      showMessage(`已用本机配置覆盖云端（版本 ${version}）`);
+      showMessage(t('msg.sync.overridden', { version }));
     } catch (error) {
-      showError(error instanceof Error ? error.message : '覆盖云端失败');
+      showError(error instanceof Error ? error.message : t('msg.sync.overrideFailed'));
     } finally {
       loadingEnd();
     }
@@ -1259,7 +1263,7 @@ export function useWorkspaceCloudSync({
       return;
     }
     if (unauthorized()) {
-      showError('请先连接 GitHub');
+      showError(t('msg.sync.needConnect'));
       return;
     }
     syncHistoryOpen.value = true;
@@ -1270,7 +1274,7 @@ export function useWorkspaceCloudSync({
       const gistId = await ensureGistId();
       if (!gistId) {
         syncHistory.value = [];
-        showMessage('未找到同步 Gist，请先完成一次同步');
+        showMessage(t('msg.sync.noGist'));
         return;
       }
       const gist = (await githubFetch(`/gists/${gistId}`)) as {
@@ -1286,7 +1290,7 @@ export function useWorkspaceCloudSync({
           dateText: formatTime(new Date(item.committed_at).getTime()),
           isCurrent,
           // 修订编号：距最新一版差几代就是 #几（当前版本不计入编号）
-          label: isCurrent ? '当前版本' : `修订 #${total - index}`,
+          label: isCurrent ? t('syncHistory.currentRevision') : t('syncHistory.revisionN', { n: total - index }),
           versionBadge: isCurrent && currentVersion > 0 ? `v${currentVersion}` : '',
         };
       });
@@ -1296,7 +1300,7 @@ export function useWorkspaceCloudSync({
         revisionError.value = '';
       }
     } catch (error) {
-      showError(error instanceof Error ? error.message : '获取历史版本失败');
+      showError(error instanceof Error ? error.message : t('msg.sync.historyFailed'));
     } finally {
       syncHistoryLoading.value = false;
     }
@@ -1318,12 +1322,12 @@ export function useWorkspaceCloudSync({
       return;
     }
     if (unauthorized() || passwordStatus.value !== 'unlocked') {
-      showError('需先连接 GitHub 并解锁同步密码');
+      showError(t('msg.sync.needUnlock'));
       return;
     }
     const gistId = await ensureGistId();
     if (!gistId) {
-      showError('未找到同步 Gist');
+      showError(t('msg.sync.noGistShort'));
       return;
     }
     selectedRevisionSha.value = sha;
@@ -1332,15 +1336,15 @@ export function useWorkspaceCloudSync({
     try {
       const gist = (await githubFetch(`/gists/${gistId}/${sha}`)) as { files?: Record<string, GistFileEntry> };
       const file = gist.files?.[GIST_FILENAME];
-      if (!file) throw new Error('该修订不包含同步文件');
-      if (!file.content || file.truncated) throw new Error('该修订数据过大且被截断，暂不支持预览');
+      if (!file) throw new Error(t('msg.sync.revisionNoFile'));
+      if (!file.content || file.truncated) throw new Error(t('msg.sync.revisionTooLarge'));
       const vault = parseVault(file.content);
       let configs: RemoteConfigPreview[];
       try {
         configs = await decryptVaultConfigs(vault, syncPassword.value);
       } catch {
         // 解密失败以错误卡展示在列表下方（同步密码不同的修订无法预览或恢复）
-        revisionError.value = '解密失败：该修订可能使用了与当前不同的同步密码（修改密码只影响之后的上传），无法预览或恢复';
+        revisionError.value = t('msg.sync.revisionDecryptFailed');
         return;
       }
       if (selectedRevisionSha.value !== sha) return;
@@ -1358,7 +1362,7 @@ export function useWorkspaceCloudSync({
     } catch (error) {
       if (selectedRevisionSha.value === sha) {
         selectedRevisionSha.value = '';
-        revisionError.value = error instanceof Error ? error.message : '预览历史版本失败';
+        revisionError.value = error instanceof Error ? error.message : t('msg.sync.previewFailed');
       }
     } finally {
       revisionPreviewLoading.value = false;
@@ -1371,20 +1375,20 @@ export function useWorkspaceCloudSync({
     const preview = revisionPreview.value;
     if (!preview || preview.sha !== selectedRevisionSha.value) return;
     if (unauthorized() || passwordStatus.value !== 'unlocked') {
-      showError('需先连接 GitHub 并解锁同步密码');
+      showError(t('msg.sync.needUnlock'));
       return;
     }
     if (syncBusy.value) {
-      showError('同步正在进行中，请稍后再试');
+      showError(t('msg.sync.syncInProgress'));
       return;
     }
     if (syncBanner.value) {
-      showError('请先处理当前的冲突/阻塞状态');
+      showError(t('msg.sync.handleBannerFirst'));
       return;
     }
     const gistId = await ensureGistId();
     if (!gistId) {
-      showError('未找到同步 Gist');
+      showError(t('msg.sync.noGistShort'));
       return;
     }
     restoringRevision.value = true;
@@ -1407,9 +1411,9 @@ export function useWorkspaceCloudSync({
       revisionPreview.value = null;
       selectedRevisionSha.value = '';
       syncHistoryOpen.value = false;
-      showMessage(`已恢复历史版本并推送为版本 ${version}（${preview.configs.length} 个图床配置）`);
+      showMessage(t('msg.sync.restored', { version, count: preview.configs.length }));
     } catch (error) {
-      showError(error instanceof Error ? error.message : '恢复历史版本失败');
+      showError(error instanceof Error ? error.message : t('msg.sync.restoreFailed'));
     } finally {
       restoringRevision.value = false;
       loadingEnd();
@@ -1430,9 +1434,9 @@ export function useWorkspaceCloudSync({
       await commitLastSync(version);
       syncRemoteState.value = { version, updatedAt: Date.now(), configCount: items.length };
       syncBanner.value = null;
-      showMessage('已推送本机数据');
+      showMessage(t('msg.sync.pushedLocal'));
     } catch (error) {
-      showError(error instanceof Error ? error.message : '推送本机数据失败');
+      showError(error instanceof Error ? error.message : t('msg.sync.pushFailed'));
     } finally {
       loadingEnd();
     }
@@ -1457,9 +1461,9 @@ export function useWorkspaceCloudSync({
       await commitLastSync(banner.remoteVersion);
       syncRemoteState.value = { version: banner.remoteVersion, updatedAt: Date.now(), configCount: banner.remoteItems.length };
       syncBanner.value = null;
-      showMessage(banner.kind === 'empty' ? '已拉取云端数据' : `已恢复远端版本（${banner.remoteItems.length} 个配置）`);
+      showMessage(banner.kind === 'empty' ? t('msg.sync.pulledCloud') : t('msg.sync.restoredRemote', { count: banner.remoteItems.length }));
     } catch (error) {
-      showError(error instanceof Error ? error.message : '恢复远端版本失败');
+      showError(error instanceof Error ? error.message : t('msg.sync.restoreRemoteFailed'));
     } finally {
       loadingEnd();
     }
@@ -1469,10 +1473,10 @@ export function useWorkspaceCloudSync({
   async function resolveConflictWithCloudPassword(cloudPassword: string): Promise<string | null> {
     const banner = syncBanner.value;
     if (!banner || banner.kind !== 'conflict' || !banner.remotePayload) {
-      return '当前没有待处理的密码冲突';
+      return t('msg.sync.noPendingConflict');
     }
     if (!cloudPassword.trim()) {
-      return '请输入云端同步密码';
+      return t('msg.sync.needCloudPassword');
     }
     loadingStart();
     try {
@@ -1488,11 +1492,11 @@ export function useWorkspaceCloudSync({
       await commitLastSync(banner.remoteVersion);
       syncRemoteState.value = { version: banner.remoteVersion, updatedAt: Date.now(), configCount: configs.length };
       syncBanner.value = null;
-      showMessage(`已使用云端密码恢复远端配置（${configs.length} 个图床配置），本机同步密码已重置`);
+      showMessage(t('msg.sync.restoredWithCloudPwd', { count: configs.length }));
       return null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      return message.includes('同步密码不正确') ? '云端密码不正确，请重试' : message;
+      return message.includes(t('msg.sync.passwordWrong')) ? t('msg.sync.cloudPwdWrong') : message;
     } finally {
       loadingEnd();
     }
@@ -1512,9 +1516,9 @@ export function useWorkspaceCloudSync({
       await commitLastSync(version);
       syncRemoteState.value = { version, updatedAt: Date.now(), configCount: items.length };
       syncBanner.value = null;
-      showMessage('已强制推送本地数据');
+      showMessage(t('msg.sync.forcePushed'));
     } catch (error) {
-      showError(error instanceof Error ? error.message : '强制推送失败');
+      showError(error instanceof Error ? error.message : t('msg.sync.forcePushFailed'));
     } finally {
       loadingEnd();
     }

@@ -2,6 +2,7 @@ import { getVersion } from '@tauri-apps/api/app';
 import { Channel } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ref } from 'vue';
+import { t } from '../../i18n';
 
 const RELEASE_PAGE_URL = 'https://github.com/zyx3721/picsw-rust/releases/latest';
 const RELEASE_DOWNLOAD_BASE = 'https://github.com/zyx3721/picsw-rust/releases/download';
@@ -140,10 +141,10 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
       updateNotes.value = latest.notes;
       updateTask = pickUpdateAsset(latest.assets, version, runtime);
       updateStatus.value = 'available';
-      if (manual) showMessage(`发现新版本 v${version}，可更新到最新版`);
+      if (manual) showMessage(t('msg.update.found', { version }));
     } catch (error) {
       updateStatus.value = 'idle';
-      if (manual) showError(error instanceof Error ? error.message : '检查更新失败');
+      if (manual) showError(error instanceof Error ? error.message : t('msg.update.checkFailed'));
     }
   }
 
@@ -156,7 +157,7 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
       try {
         await openUrl(RELEASE_PAGE_URL);
       } catch (error) {
-        showError(error instanceof Error ? error.message : '打开发布页失败');
+        showError(error instanceof Error ? error.message : t('about.openReleasesFailed'));
       }
       return;
     }
@@ -178,7 +179,7 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
     } catch (error) {
       updateStatus.value = updateVersion.value ? 'available' : 'idle';
       updateProgress.value = null;
-      showError(error instanceof Error ? error.message : '更新失败');
+      showError(error instanceof Error ? error.message : t('msg.update.failed'));
     }
   }
 
@@ -191,7 +192,7 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
         body: JSON.stringify({ file_path: downloadedPath }),
       });
     } catch (error) {
-      showError(error instanceof Error ? error.message : '应用更新失败，可重试或打开更新包手动安装');
+      showError(error instanceof Error ? error.message : t('msg.update.applyFailed'));
     }
   }
 
@@ -204,7 +205,7 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
         body: JSON.stringify({ file_path: downloadedPath }),
       });
     } catch (error) {
-      showError(error instanceof Error ? error.message : '打开更新包失败');
+      showError(error instanceof Error ? error.message : t('msg.update.openPackageFailed'));
     }
   }
 
@@ -232,8 +233,8 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
 /// 把时间戳格式化为「X 分钟/小时/天前」的相对时间
 export function relativeTimeText(timestamp: number) {
   const elapsed = Date.now() - timestamp;
-  if (elapsed < 60 * 1000) return '刚刚';
-  if (elapsed < 60 * 60 * 1000) return `${Math.floor(elapsed / (60 * 1000))} 分钟前`;
-  if (elapsed < 24 * 60 * 60 * 1000) return `${Math.floor(elapsed / (60 * 60 * 1000))} 小时前`;
-  return `${Math.floor(elapsed / (24 * 60 * 60 * 1000))} 天前`;
+  if (elapsed < 60 * 1000) return t('msg.justNow');
+  if (elapsed < 60 * 60 * 1000) return t('msg.minutesAgo', { count: Math.floor(elapsed / (60 * 1000)) });
+  if (elapsed < 24 * 60 * 60 * 1000) return t('msg.hoursAgo', { count: Math.floor(elapsed / (60 * 60 * 1000)) });
+  return t('msg.daysAgo', { count: Math.floor(elapsed / (24 * 60 * 60 * 1000)) });
 }

@@ -2,6 +2,7 @@ import { computed, ref, watch, type Ref } from 'vue';
 import { open } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import type { DownloadDocument, DownloadImageItem, DownloadImageResult, MarkdownImage } from './types';
+import { t } from '../../i18n';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -90,7 +91,7 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
       }
       rebuildItems();
     } catch (error) {
-      showError(error instanceof Error ? error.message : '分析网络图片失败');
+      showError(error instanceof Error ? error.message : t('msg.download.analyzeFailed'));
     } finally {
       loading.value = false;
     }
@@ -166,15 +167,15 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
       });
       const failed = results.filter(result => result.status !== 'success').length;
       const message = failed === 0
-        ? `下载完成：成功 ${results.length} 张，已保存到 ${downloadTargetDir.value.trim()}`
-        : `下载完成：成功 ${results.length - failed} 张，失败 ${failed} 张`;
+        ? t('msg.download.done', { success: results.length, dir: downloadTargetDir.value.trim() })
+        : t('msg.download.donePartial', { success: results.length - failed, failed });
       if (failed === 0) showMessage(message);
       else showError(message);
     } catch (error) {
       downloadItems.value.forEach(item => {
         if (item.status === 'downloading') item.status = 'failed';
       });
-      showError(error instanceof Error ? error.message : '下载图片失败');
+      showError(error instanceof Error ? error.message : t('msg.download.failed'));
     } finally {
       downloadActive.value = false;
     }
