@@ -2,11 +2,12 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ArrowRightLeft, Cloud, DownloadCloud, FolderUp, History, Info, Settings } from 'lucide-vue-next';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
-import { t } from '../../i18n';
+import { t, useI18n } from '../../i18n';
 
 type WorkspaceTab = 'convert' | 'localUpload' | 'download' | 'configs' | 'records' | 'cloudSync' | 'about';
 
 const { activeTab, setActiveTab, isAuthed } = useWorkspaceContext();
+const { locale } = useI18n();
 const tabOrder: WorkspaceTab[] = ['convert', 'localUpload', 'download', 'configs', 'records', 'cloudSync', 'about'];
 const tabsRef = ref<HTMLElement | null>(null);
 const tabButtonRefs = ref<Record<WorkspaceTab, HTMLButtonElement | null>>({
@@ -52,6 +53,9 @@ function handleTabsResize() {
 watch(activeTab, (tab, oldTab) => {
   const duration = oldTab ? tabMoveDuration(oldTab as WorkspaceTab, tab as WorkspaceTab) : '0ms';
   void nextTick(() => updateTabsIndicator(duration));
+});
+watch(locale, () => {
+  void nextTick(() => updateTabsIndicator('0ms'));
 });
 watch(isAuthed, authed => {
   if (!authed) return;
