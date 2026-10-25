@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ImageUp, Languages, Moon, Sun } from 'lucide-vue-next';
+import AppTooltip from '../AppTooltip.vue';
 import { useTheme } from '../../composables/useTheme';
 import { t, useI18n } from '../../i18n';
 
@@ -17,26 +18,28 @@ const { locale, toggleLocale } = useI18n();
       </div>
     </div>
     <div class="topbar-actions">
-      <button
-        class="ghost icon-only topbar-action"
-        type="button"
-        :title="theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')"
-        :aria-label="theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')"
-        @click="toggleTheme"
-      >
-        <Sun v-if="theme === 'dark'" :size="18" />
-        <Moon v-else :size="18" />
-      </button>
-      <button
-        class="ghost topbar-action lang"
-        type="button"
-        :title="locale === 'zh' ? t('header.langToEn') : t('header.langToZh')"
-        :aria-label="locale === 'zh' ? t('header.langToEn') : t('header.langToZh')"
-        @click="toggleLocale"
-      >
-        <Languages :size="17" />
-        <span>{{ locale === 'zh' ? 'EN' : '中' }}</span>
-      </button>
+      <AppTooltip :label="theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')" center>
+        <button
+          class="ghost icon-only topbar-action"
+          type="button"
+          :aria-label="theme === 'dark' ? t('header.themeToLight') : t('header.themeToDark')"
+          @click="toggleTheme"
+        >
+          <Sun v-if="theme === 'dark'" :size="18" />
+          <Moon v-else :size="18" />
+        </button>
+      </AppTooltip>
+      <AppTooltip :label="locale === 'zh' ? t('header.langToEn') : t('header.langToZh')" center>
+        <button
+          class="ghost topbar-action lang"
+          type="button"
+          :aria-label="locale === 'zh' ? t('header.langToEn') : t('header.langToZh')"
+          @click="toggleLocale"
+        >
+          <Languages :size="17" />
+          <span>{{ locale === 'zh' ? 'EN' : '中' }}</span>
+        </button>
+      </AppTooltip>
     </div>
   </header>
 </template>
