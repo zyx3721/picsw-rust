@@ -181,16 +181,14 @@ pub async fn upload(picbed_type: &str, cfg: &serde_json::Map<String, Value>, ima
     }
 }
 
+// 配置测试图使用 1920x1200 PNG，满足 EasyImage 等图床的最小尺寸校验
+const TEST_IMAGE: &[u8] = include_bytes!("test_image.png");
+
 pub async fn test_config(picbed_type: &str, cfg: &serde_json::Map<String, Value>) -> Result<(), String> {
     let mut image = ImageFile {
-        filename: "picbed-switcher-test.png".to_string(),
+        filename: "picbed-switcher-test-v2.png".to_string(),
         content_type: "image/png".to_string(),
-        data: vec![
-            0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00,
-            0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0a, 0x49,
-            0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4, 0x00, 0x00,
-            0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
-        ],
+        data: TEST_IMAGE.to_vec(),
     };
     upload(picbed_type, cfg, &mut image).await.map(|_| ())
 }
@@ -453,4 +451,17 @@ pub fn find_url(value: &Value) -> String {
 
 pub fn encode_base64(data: &[u8]) -> String {
     BASE64.encode(data)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TEST_IMAGE;
+
+    #[test]
+    fn test_image_meets_common_minimum_size() {
+        assert_eq!(&TEST_IMAGE[1..4], b"PNG");
+        let width = u32::from_be_bytes(TEST_IMAGE[16..20].try_into().unwrap());
+        let height = u32::from_be_bytes(TEST_IMAGE[20..24].try_into().unwrap());
+        assert_eq!((width, height), (1920, 1200));
+    }
 }
