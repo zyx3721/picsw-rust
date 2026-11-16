@@ -7,6 +7,7 @@ const CREATE_ATTEMPTS: usize = 3;
 const RETRY_BASE_DELAY_MS: u64 = 300;
 
 // Gitee 目标路径的查询结果
+#[derive(Debug, PartialEq, Eq)]
 enum GiteeObject {
     Missing,
     File { sha: String, download_url: String },
@@ -114,16 +115,26 @@ async fn lookup_object(repo: &str, branch: &str, token: &str, object: &str) -> G
             let Ok(value) = response.json::<serde_json::Value>().await else {
                 return GiteeObject::Unknown;
             };
-            if value.is_array() {
-                return GiteeObject::Directory;
-            }
-            let sha = value.get("sha").and_then(|item| item.as_str()).unwrap_or("").to_string();
-            let download_url = value.get("download_url").and_then(|item| item.as_str()).unwrap_or("").to_string();
-            GiteeObject::File { sha, download_url }
+            classify_object(value)
         }
         404 => GiteeObject::Missing,
         _ => GiteeObject::Unknown,
     }
+}
+
+// Gitee 查询不存在的路径会返回空数组，需按缺失处理而不是同名目录
+fn classify_object(value: serde_json::Value) -> GiteeObject {
+    if value.is_array() {
+        let empty = value.as_array().map(|items| items.is_empty()).unwrap_or(false);
+        return if empty {
+            GiteeObject::Missing
+        } else {
+            GiteeObject::Directory
+        };
+    }
+    let sha = value.get("sha").and_then(|item| item.as_str()).unwrap_or("").to_string();
+    let download_url = value.get("download_url").and_then(|item| item.as_str()).unwrap_or("").to_string();
+    GiteeObject::File { sha, download_url }
 }
 
 fn prefer_download_url(download_url: String, repo: &str, branch: &str, object: &str) -> String {
@@ -160,7 +171,14 @@ fn is_transient_create_error(message: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_duplicate_error, is_transient_create_error};
+    use super::{classify_object, is_duplicate_error, is_transient_create_error, GiteeObject};
+    use serde_json::json;
+
+    #[test]
+    fn empty_gitee_listing_is_missing() {
+        assert_eq!(classify_object(json!([])), GiteeObject::Missing);
+        assert_eq!(classify_object(json!([{"name": "a"}])), GiteeObject::Directory);
+    }
 
     #[test]
     fn duplicate_errors_are_detected() {

@@ -141,8 +141,12 @@ async fn lookup_object(repo: &str, branch: &str, token: &str, object: &str) -> G
             let Ok(value) = response.json::<serde_json::Value>().await else {
                 return GithubObject::Unknown;
             };
-            if value.is_array() {
-                return GithubObject::Directory;
+            if let Some(items) = value.as_array() {
+                return if items.is_empty() {
+                    GithubObject::Missing
+                } else {
+                    GithubObject::Directory
+                };
             }
             let sha = value.get("sha").and_then(|item| item.as_str()).unwrap_or("").to_string();
             let download_url = value.get("download_url").and_then(|item| item.as_str()).unwrap_or("").to_string();
