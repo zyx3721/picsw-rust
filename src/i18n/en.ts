@@ -33,8 +33,8 @@ export const en: Record<keyof typeof zh, string> = {
 
   'metric.configs': 'Picbed Configs',
   'metric.queueImages': 'Queued Images',
-  'metric.queueSuccess': 'Converted in Queue',
-  'metric.historySuccess': 'Successful Records',
+  'metric.queueSuccess': 'Converted',
+  'metric.historySuccess': 'Total Success',
 
   'convert.title': 'Markdown Queue',
   'convert.uploadHint': 'Upload or drop .md files',
@@ -232,7 +232,7 @@ export const en: Record<keyof typeof zh, string> = {
   'about.progress': '{percent}% ({done} / {total})',
   'about.downloaded': 'Downloaded {size}',
   'about.closeBehaviorTitle': 'When Closing Window',
-  'about.closeBehaviorDesc': '"Ask every time" shows a confirmation dialog on each close (with a remember option); after minimizing, the app keeps running in the background — conversions continue, and the window can be restored or the app quit from the system tray',
+  'about.closeBehaviorDesc': '"Ask" shows a dialog on first close; after minimizing, the app keeps running in the background — conversions continue, and the window can be restored or the app quit from the system tray',
   'about.closeAsk': 'Ask every time',
   'about.closeTray': 'Minimize to tray',
   'about.closeQuit': 'Quit app',
@@ -283,7 +283,7 @@ export const en: Record<keyof typeof zh, string> = {
   'dlg.syncPwd.confirmLabel': 'Confirm Password',
   'dlg.syncPwd.confirmPlaceholder': 'Re-enter sync password',
   'dlg.syncPwd.mismatch': 'Passwords do not match',
-  'dlg.syncPwd.note': 'Only ciphertext is stored in the cloud (AES-256-GCM + PBKDF2); the password is never uploaded. This device remembers it in the local secret store (system keychain or encrypted file; memory only when unavailable). All devices must use the same password; if forgotten, the cloud data cannot be decrypted and the sync Gist must be deleted to start over.',
+  'dlg.syncPwd.note': 'Only ciphertext is stored in the cloud (AES-256-GCM + PBKDF2). The password is never saved — all devices must use the same password; if forgotten, the cloud data cannot be decrypted and the sync Gist must be deleted to start over.',
   'dlg.syncPwd.submitSet': 'Set',
   'dlg.syncPwd.submitChange': 'Change',
 
@@ -461,7 +461,7 @@ export const en: Record<keyof typeof zh, string> = {
   'msg.sync.passwordWrong': 'Incorrect sync password',
   'msg.sync.currentPasswordWrong': 'Current password is incorrect',
   'msg.sync.passwordSet': 'Sync password configured',
-  'msg.sync.passwordChanged': 'Sync password changed; cloud data will be re-encrypted with the new password on the next config-change sync',
+  'msg.sync.passwordChanged': 'Sync password changed; cloud data will be encrypted with the new password on the next config-change sync',
   'msg.sync.noLocalToken': 'No usable GitHub token on this device; reconnect',
   'msg.sync.tokenUnavailable': 'GitHub token on this device is unavailable; reconnect or click "Revalidate"',
   'msg.sync.revalidateFailed': 'Revalidation failed',
