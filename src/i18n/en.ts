@@ -227,7 +227,7 @@ export const en: Record<keyof typeof zh, string> = {
   'about.updating': 'Updating…',
   'about.updateTo': 'Update to v{version}',
   'about.autoCheckTitle': 'Automatically Check for Updates',
-  'about.autoCheckDesc': 'Silently checks for updates on launch (once per 24 hours); manual checks anytime',
+  'about.autoCheckDesc': 'Silently checks for updates on every launch; manual checks anytime',
   'about.lastCheckSuffix': 'Last check: {when}; ',
   'about.progress': '{percent}% ({done} / {total})',
   'about.downloaded': 'Downloaded {size}',

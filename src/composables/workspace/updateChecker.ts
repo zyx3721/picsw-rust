@@ -7,7 +7,6 @@ import { t } from '../../i18n';
 const RELEASE_PAGE_URL = 'https://github.com/zyx3721/picsw-rust/releases/latest';
 const RELEASE_DOWNLOAD_BASE = 'https://github.com/zyx3721/picsw-rust/releases/download';
 const AUTO_CHECK_DELAY_MS = 8000;
-const AUTO_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const UP_TO_DATE_RESET_MS = 5000;
 const AUTO_CHECK_STORAGE_KEY = 'picbed_update_auto_check';
 const LAST_CHECK_STORAGE_KEY = 'picbed_update_last_check_at';
@@ -84,12 +83,6 @@ function pickUpdateAsset(assets: string[] | null, version: string, runtime: Upda
 
 function autoCheckStorageEnabled() {
   return localStorage.getItem(AUTO_CHECK_STORAGE_KEY) !== '0';
-}
-
-/// 距上次检查超过 24 小时（或从未检查过）才发起启动静默检查，节制 GitHub 匿名接口限额
-function shouldRunStartupCheck() {
-  const last = Number(localStorage.getItem(LAST_CHECK_STORAGE_KEY)) || 0;
-  return Date.now() - last >= AUTO_CHECK_INTERVAL_MS;
 }
 
 export function createUpdateChecker({ request, showMessage, showError }: UpdateCheckerDeps) {
@@ -210,7 +203,7 @@ export function createUpdateChecker({ request, showMessage, showError }: UpdateC
   }
 
   setTimeout(() => {
-    if (!autoCheckStorageEnabled() || !shouldRunStartupCheck()) return;
+    if (!autoCheckStorageEnabled()) return;
     void checkUpdate(false);
   }, AUTO_CHECK_DELAY_MS);
 

@@ -225,7 +225,7 @@ export const zh = {
   'about.updating': '更新中…',
   'about.updateTo': '更新到 v{version}',
   'about.autoCheckTitle': '自动检查更新',
-  'about.autoCheckDesc': '启动后静默检查新版本（每 24 小时一次），可随时手动检查',
+  'about.autoCheckDesc': '每次启动后静默检查新版本，可随时手动检查',
   'about.lastCheckSuffix': '上次检查：{when}；',
   'about.progress': '{percent}%（{done} / {total}）',
   'about.downloaded': '已下载 {size}',
