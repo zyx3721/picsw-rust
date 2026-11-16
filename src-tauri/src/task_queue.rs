@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc;
@@ -101,14 +102,16 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
         )
     });
 
+    let upload_cache: engine::RemoteUploadCache = Arc::new(std::sync::Mutex::new(HashMap::new()));
     let semaphore = Arc::new(tokio::sync::Semaphore::new(CONVERT_DOCUMENT_CONCURRENCY));
     let mut set = tokio::task::JoinSet::new();
     for file in files {
         let permit = semaphore.clone().acquire_owned().await.expect("semaphore open");
         let app = app.clone();
+        let upload_cache = upload_cache.clone();
         set.spawn(async move {
             let state = app.state::<AppState>();
-            let result = engine::convert_one(&state, &file, Some(task_id)).await;
+            let result = engine::convert_one(&state, &file, &upload_cache, Some(task_id)).await;
             drop(permit);
             match result {
                 Ok(_) => Ok(()),

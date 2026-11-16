@@ -117,7 +117,12 @@ enum PendingImage {
     Failed { message: String },
 }
 
-pub async fn convert_one(state: &AppState, req: &MarkdownRequest, task_id: Option<i64>) -> Result<serde_json::Value, String> {
+pub async fn convert_one(
+    state: &AppState,
+    req: &MarkdownRequest,
+    upload_cache: &RemoteUploadCache,
+    task_id: Option<i64>,
+) -> Result<serde_json::Value, String> {
     if req.content.trim().is_empty() {
         return Err("Markdown 内容不能为空".to_string());
     }
@@ -147,19 +152,13 @@ pub async fn convert_one(state: &AppState, req: &MarkdownRequest, task_id: Optio
 
     let unique_urls = collect_unique_urls(&images);
     let mut resolved: HashMap<String, PendingImage> = HashMap::new();
-    let mut upload_cache: HashMap<String, String> = HashMap::new();
     for image_url in unique_urls {
         if !is_http_image_url(&image_url) {
             resolved.insert(image_url.clone(), PendingImage::Keep(image_url));
             continue;
         }
-        if let Some(cached) = upload_cache.get(&image_url) {
-            resolved.insert(image_url.clone(), PendingImage::Use { url: cached.clone() });
-            continue;
-        }
-        match download_and_upload(&image_url, &target.picbed_type, &target_config).await {
+        match upload_cached(upload_cache, target.id, &image_url, &target.picbed_type, &target_config).await {
             Ok(url) => {
-                upload_cache.insert(image_url.clone(), url.clone());
                 resolved.insert(image_url.clone(), PendingImage::Use { url });
             }
             Err(err) => {
@@ -243,6 +242,8 @@ pub async fn convert_one(state: &AppState, req: &MarkdownRequest, task_id: Optio
 
 pub type LocalImageLoader = Arc<dyn Fn(&str) -> Result<ImageFile, String> + Send + Sync>;
 pub type LocalUploadCache = Arc<std::sync::Mutex<HashMap<String, String>>>;
+// 任务级远程上传缓存：同一源图片在多个文档中只上传一次
+pub type RemoteUploadCache = Arc<std::sync::Mutex<HashMap<String, Arc<tokio::sync::OnceCell<String>>>>>;
 
 pub async fn convert_local_one(
     state: &AppState,
@@ -395,6 +396,24 @@ async fn download_and_upload(
         .await
         .map(|result| result.url)
         .map_err(|err| format!("上传图片 {} 失败：{}", image_url, err))
+}
+
+async fn upload_cached(
+    cache: &RemoteUploadCache,
+    config_id: i64,
+    image_url: &str,
+    picbed_type: &str,
+    cfg: &serde_json::Map<String, serde_json::Value>,
+) -> Result<String, String> {
+    let key = format!("{}|{}", config_id, image_url);
+    let cell = match cache.lock() {
+        Ok(mut entries) => entries.entry(key).or_insert_with(|| Arc::new(tokio::sync::OnceCell::new())).clone(),
+        Err(_) => Arc::new(tokio::sync::OnceCell::new()),
+    };
+    let url = cell
+        .get_or_try_init(|| async { download_and_upload(image_url, picbed_type, cfg).await })
+        .await?;
+    Ok(url.clone())
 }
 
 fn success_detail(original_url: &str, target_url: &str) -> ConversionRecordDetail {
