@@ -48,7 +48,7 @@ Your documents, conversion history and image-host credentials stay on your own d
 ## What It Does
 
 - **Multi-host support** — GitHub, Gitee, Tencent Cloud COS, Aliyun OSS, Qiniu Kodo, Baidu BOS, Huawei OBS, Upyun, MinIO and EasyImage, plus self-hosted services with generic upload APIs.
-- **Document conversion** — Automatically detects image URLs and their hosts in uploaded Markdown; pick a target host and batch-convert in one click, then download the replaced document.
+- **Document conversion** — Automatically detects image URLs and their hosts in uploaded Markdown; pick a target host and batch-convert in one click, then download the replaced document. Queue items can be removed one by one or cleared all at once.
 - **Local upload** — Detects local image references (relative paths, absolute paths, `<img>` tags), uploads them to the target host and replaces them with remote URLs automatically.
 - **Task queue** — Batch conversion and local upload both run as persisted tasks consumed by a background worker, with document-level concurrency (3) inside each task (GitHub/Gitee uploads to the same repository branch are serialized); queued tasks resume automatically after an app restart, with progress visible at any time.
 - **Filename formatting** — Object paths support `{y}`, `{m}`, `{d}`, `{hash}`, `{random}`, `{rand:N}`, `{timestamp}` and more, for date folders, content hashes or custom templates.

@@ -233,6 +233,14 @@ export function useWorkspaceConvert({
     batchFiles.value = batchFiles.value.filter(item => item.id !== id);
     persistConvertWorkspace();
   }
+  /// 清空整个转换队列：保留目标配置选择，已转换结果与本地文件不受影响
+  function clearBatchFiles() {
+    const count = batchFiles.value.length;
+    if (!count) return;
+    batchFiles.value = [];
+    persistConvertWorkspace();
+    showMessage(t('msg.convert.cleared', { count }));
+  }
   function closeGithubProxyDialog() {
     githubProxyDialogOpen.value = false;
     githubProxyEnabled.value = true;
@@ -459,6 +467,7 @@ export function useWorkspaceConvert({
     handleFileDrop,
     addPastedDocument,
     removeBatchFile,
+    clearBatchFiles,
     analyzeBatch,
     convertBatch,
     closeGithubProxyDialog,

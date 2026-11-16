@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown, Download, Eye, FileSearch, Plus, Trash2, UploadCloud, Wand2 } from 'lucide-vue-next';
+import { ref } from 'vue';
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import { t } from '../../i18n';
@@ -23,6 +24,7 @@ const {
   handleFileDrop,
   addPastedDocument,
   removeBatchFile,
+  clearBatchFiles,
   statusLabel,
   downloadFile,
   togglePreview,
@@ -31,6 +33,14 @@ const {
   convertBatch,
   downloadAll,
 } = useWorkspaceContext();
+
+const clearConfirmOpen = ref(false);
+
+/// 确认后清空队列并关闭弹窗
+function confirmClearQueue() {
+  clearConfirmOpen.value = false;
+  clearBatchFiles();
+}
 </script>
 
 <template>
@@ -63,6 +73,12 @@ const {
         ></textarea></label
       ><button class="secondary" type="button" @click="addPastedDocument">
         <Plus :size="18" />{{ t('convert.joinQueue') }}
+      </button>
+    </div>
+    <div v-if="batchFiles.length" class="batch-list-head">
+      <span>{{ t('convert.queueCount', { count: batchFiles.length }) }}</span>
+      <button class="ghost danger-text" type="button" :disabled="loading" @click="clearConfirmOpen = true">
+        <Trash2 :size="15" />{{ t('convert.clearAll') }}
       </button>
     </div>
     <div class="batch-list">
@@ -182,5 +198,22 @@ const {
       <Download :size="18" />{{ t('common.downloadAll') }}
     </button>
   </div>
+  <Teleport to="body">
+    <div v-if="clearConfirmOpen" class="modal-backdrop" role="presentation" @click.self="clearConfirmOpen = false">
+      <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-queue-title">
+        <div class="dialog-icon"><Trash2 :size="22" /></div>
+        <div class="dialog-copy">
+          <h2 id="clear-queue-title">{{ t('convert.clearAllTitle') }}</h2>
+          <p>{{ t('convert.clearAllDesc', { count: batchFiles.length }) }}</p>
+        </div>
+        <div class="dialog-actions">
+          <button class="ghost" type="button" @click="clearConfirmOpen = false">{{ t('common.cancel') }}</button>
+          <button class="danger" type="button" @click="confirmClearQueue">
+            <Trash2 :size="17" />{{ t('convert.clearAllConfirm') }}
+          </button>
+        </div>
+      </section>
+    </div>
+  </Teleport>
 </section>
 </template>

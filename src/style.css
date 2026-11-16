@@ -1883,6 +1883,28 @@ svg {
   width: 0;
   height: 0;
 }
+.batch-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 750;
+}
+.batch-list-head .danger-text {
+  min-height: 32px;
+  padding: 0 10px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--danger);
+  font-size: 12px;
+}
+.batch-list-head .danger-text:hover:not(:disabled) {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
 .config-list {
   display: flex;
   flex-direction: column;
@@ -3160,6 +3182,10 @@ html.dark .secondary:hover:not(:disabled) {
 }
 html.dark .danger {
   border-color: rgba(248, 113, 113, 0.35);
+}
+html.dark .batch-list-head .danger-text:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.14);
+  color: #f87171;
 }
 html.dark .notice.success {
   border-color: rgba(74, 222, 128, 0.35);
