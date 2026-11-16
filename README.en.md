@@ -235,7 +235,7 @@ This is macOS Gatekeeper blocking an unsigned app, not actual corruption (the ap
 sudo xattr -rd com.apple.quarantine "/Applications/PicBed Switcher.app"
 ```
 
-This is especially common on Apple silicon Macs; the portable tar.gz archives usually do not trigger this prompt.
+This is especially common on Apple silicon Macs; the portable tar.gz archives usually do not trigger this prompt. Versions installed through the in-app "Check for Updates" flow automatically remove the quarantine attribute and apply ad-hoc signing, so the command does not need to be run again after an update; the first installation still requires it once.
 
 ## Repository Layout
 

@@ -233,7 +233,7 @@ npm run tauri build
 sudo xattr -rd com.apple.quarantine "/Applications/PicBed Switcher.app"
 ```
 
-该问题在 Apple Silicon 芯片的 Mac 上尤为常见；便携版 tar.gz 解压后一般不会出现此提示。
+该问题在 Apple Silicon 芯片的 Mac 上尤为常见；便携版 tar.gz 解压后一般不会出现此提示。通过应用内「检查更新」安装的新版本会自动移除隔离属性并做 ad-hoc 签名，更新后无需再次执行上述命令；首次安装仍需执行一次。
 
 ## 项目结构
 

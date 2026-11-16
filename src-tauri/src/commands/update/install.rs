@@ -176,7 +176,17 @@ async fn install_portable_unix(package: &Path) -> Result<(), String> {
     }
 
     let (staged, target) = resolve_portable_target(&extract_dir)?;
+    #[cfg(target_os = "macos")]
+    {
+        if staged.is_dir() {
+            prepare_macos_bundle(&staged).await?;
+        }
+    }
     replace_path(&staged, &target).await?;
+    #[cfg(target_os = "macos")]
+    {
+        remove_macos_quarantine(&target).await;
+    }
     restart_self()
 }
 
@@ -235,6 +245,90 @@ fn find_extracted_file(dir: &Path, file_name: &str) -> Option<PathBuf> {
     None
 }
 
+/// 将 dmg 中的 .app 暂存到可写临时目录，便于签名与移除隔离属性
+#[cfg(target_os = "macos")]
+async fn stage_macos_app(mount: &Path, dir: &Path) -> Result<PathBuf, String> {
+    let app = find_extracted_dir(mount, ".app")
+        .ok_or_else(|| "更新镜像中未找到应用包".to_string())?;
+    let name = app
+        .file_name()
+        .ok_or_else(|| "应用包名称不合法".to_string())?;
+    let stage_dir = dir.join("macos-stage");
+    let _ = std::fs::remove_dir_all(&stage_dir);
+    std::fs::create_dir_all(&stage_dir).map_err(|e| format!("创建暂存目录失败: {e}"))?;
+    let staged = stage_dir.join(name);
+    let output = tokio::process::Command::new("ditto")
+        .arg(&app)
+        .arg(&staged)
+        .output()
+        .await
+        .map_err(|e| format!("无法启动 ditto: {e}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "暂存更新应用失败: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    Ok(staged)
+}
+
+/// macOS 更新包预处理：签名校验失败时做 ad-hoc 签名，并移除隔离属性
+#[cfg(target_os = "macos")]
+async fn prepare_macos_bundle(bundle: &Path) -> Result<(), String> {
+    let bundle_text = bundle.to_string_lossy().to_string();
+    let verify = tokio::process::Command::new("codesign")
+        .arg("--verify")
+        .arg("--deep")
+        .arg("--strict")
+        .arg(&bundle_text)
+        .output()
+        .await
+        .map_err(|e| format!("无法启动 codesign: {e}"))?;
+    if !verify.status.success() {
+        let sign = tokio::process::Command::new("codesign")
+            .arg("--force")
+            .arg("--deep")
+            .arg("--sign")
+            .arg("-")
+            .arg(&bundle_text)
+            .output()
+            .await
+            .map_err(|e| format!("无法启动 codesign: {e}"))?;
+        if !sign.status.success() {
+            return Err(format!(
+                "更新包 ad-hoc 签名失败: {}",
+                String::from_utf8_lossy(&sign.stderr).trim()
+            ));
+        }
+        let verify_again = tokio::process::Command::new("codesign")
+            .arg("--verify")
+            .arg("--deep")
+            .arg("--strict")
+            .arg(&bundle_text)
+            .output()
+            .await
+            .map_err(|e| format!("无法启动 codesign: {e}"))?;
+        if !verify_again.status.success() {
+            return Err(format!(
+                "更新包 ad-hoc 签名后仍无法通过校验: {}",
+                String::from_utf8_lossy(&verify_again.stderr).trim()
+            ));
+        }
+    }
+    remove_macos_quarantine(bundle).await;
+    Ok(())
+}
+
+/// 递归移除 macOS 隔离属性（尽力而为，属性不存在时命令会失败但可忽略）
+#[cfg(target_os = "macos")]
+async fn remove_macos_quarantine(target: &Path) {
+    let _ = tokio::process::Command::new("xattr")
+        .args(["-rd", "com.apple.quarantine"])
+        .arg(target)
+        .output()
+        .await;
+}
+
 /// 通用「改名换入」替换：先把产物拷贝到目标同目录暂存（保证最终 rename 同卷原子），
 /// 目标改名 `.old` 备份后换入，失败回滚；`.old` 残留由启动清理兜底
 #[cfg(unix)]
@@ -250,13 +344,21 @@ async fn replace_path(staged: &Path, target: &Path) -> Result<(), String> {
     let _ = std::fs::remove_dir_all(&staging);
     let _ = std::fs::remove_file(&staging);
     if staged.is_dir() {
-        let output = tokio::process::Command::new("cp")
-            .args(["-R"])
-            .arg(staged)
-            .arg(&staging)
-            .output()
-            .await
-            .map_err(|e| format!("无法启动 cp: {e}"))?;
+        let output = if cfg!(target_os = "macos") {
+            tokio::process::Command::new("ditto")
+                .arg(staged)
+                .arg(&staging)
+                .output()
+                .await
+        } else {
+            tokio::process::Command::new("cp")
+                .args(["-R"])
+                .arg(staged)
+                .arg(&staging)
+                .output()
+                .await
+        };
+        let output = output.map_err(|e| format!("无法启动复制命令: {e}"))?;
         if !output.status.success() {
             return Err(format!("拷贝新版本失败（目标目录可能只读）：{}", String::from_utf8_lossy(&output.stderr).trim()));
         }
@@ -301,18 +403,19 @@ async fn install_macos_dmg(package: &Path) -> Result<(), String> {
         return Err(format!("挂载更新镜像失败: {}", String::from_utf8_lossy(&attach.stderr).trim()));
     }
 
-    let staged_in_volume = find_extracted_dir(&mount, ".app")
-        .ok_or_else(|| "更新镜像中未找到应用包".to_string());
-    let staged_in_volume = match staged_in_volume {
+    let staged = match stage_macos_app(&mount, &temp_update_dir()).await {
         Ok(path) => path,
         Err(error) => {
             let _ = detach_dmg(&mount).await;
             return Err(error);
         }
     };
-
-    let result = replace_path(&staged_in_volume, &bundle).await;
     let _ = detach_dmg(&mount).await;
+    prepare_macos_bundle(&staged).await?;
+    let result = replace_path(&staged, &bundle).await;
+    if result.is_ok() {
+        remove_macos_quarantine(&bundle).await;
+    }
     result?;
     restart_self()
 }
