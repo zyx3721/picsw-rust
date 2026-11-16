@@ -8,6 +8,7 @@ type TranslationRule = {
 
 const RULES: TranslationRule[] = [
   { pattern: /（已自动重试 (\d+) 次）/, replacement: ' (auto-retried $1 times)' },
+  { pattern: /（code (\d+)）/, replacement: ' (code $1)' },
   {
     pattern: /上传失败：\{"message":"(?:文件名已存在|文件已存在|文件已经存在)"\}/,
     replacement: 'Upload failed: a file with the same name already exists',
@@ -74,6 +75,21 @@ const RULES: TranslationRule[] = [
     replacement: 'Upyun USS configuration is missing the acceleration domain, so a public URL cannot be generated',
   },
   { pattern: /EasyImage 配置缺少 API 地址或 Token/, replacement: 'EasyImage configuration is missing the API URL or token' },
+  { pattern: /EasyImage API 地址不正确，请填写完整地址/, replacement: 'EasyImage API URL is invalid; enter the full URL' },
+  {
+    pattern: /EasyImage API 地址不存在，请检查是否填写为 \/api\/index\.php/,
+    replacement: 'EasyImage API URL does not exist; check whether it should be /api/index.php',
+  },
+  {
+    pattern: /EasyImage 返回内容不是 JSON，请检查 API 地址：/,
+    replacement: 'EasyImage returned non-JSON content; check the API URL: ',
+  },
+  { pattern: /EasyImage 上传响应内容为空/, replacement: 'EasyImage upload response was empty' },
+  {
+    pattern: /EasyImage 上传响应缺少图片地址：/,
+    replacement: 'EasyImage upload response did not include an image URL: ',
+  },
+  { pattern: /EasyImage 上传失败：/, replacement: 'EasyImage upload failed: ' },
   { pattern: /暂不支持上传到(.+)$/, replacement: 'Uploading to $1 is not supported' },
   { pattern: /本地图片 (\S+) 未匹配到上传文件/, replacement: 'Local image $1 has no matching uploaded file' },
   { pattern: /存在 (\d+) 个图片无法转换/, replacement: '$1 images could not be converted' },
