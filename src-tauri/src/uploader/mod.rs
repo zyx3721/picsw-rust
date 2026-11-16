@@ -1,6 +1,7 @@
 mod easyimage;
 mod gitee;
 mod github;
+mod repo;
 mod s3;
 mod upyun;
 

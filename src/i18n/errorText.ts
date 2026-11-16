@@ -28,6 +28,16 @@ const RULES: TranslationRule[] = [
   { pattern: /Gitee 上传响应缺少图片地址/, replacement: 'Gitee upload response did not include an image URL' },
   { pattern: /Gitee 上传失败/, replacement: 'Gitee upload failed' },
   {
+    pattern: /GitHub 目标文件已存在且内容不同：(.*?)，请调整文件命名格式或存储路径/,
+    replacement: 'GitHub target file already exists with different content: $1; change the filename format or storage path',
+  },
+  {
+    pattern: /GitHub 目标路径已被同名目录占用：(.*?)，请更换存储路径或文件命名格式/,
+    replacement: 'GitHub target path is already used by a directory: $1; change the storage path or filename format',
+  },
+  { pattern: /GitHub 上传响应缺少图片地址/, replacement: 'GitHub upload response did not include an image URL' },
+  { pattern: /GitHub 上传失败/, replacement: 'GitHub upload failed' },
+  {
     pattern: /GitHub 配置缺少仓库、分支或 Token/,
     replacement: 'GitHub configuration is missing the repository, branch, or token',
   },
@@ -79,6 +89,7 @@ const RULES: TranslationRule[] = [
   { pattern: /图片大小不能超过 20MB/, replacement: 'Images must be 20 MB or smaller' },
   { pattern: /图片地址仅支持 HTTP 或 HTTPS/, replacement: 'Only HTTP or HTTPS image URLs are supported' },
   { pattern: /图片地址不正确/, replacement: 'Invalid image URL' },
+  { pattern: /上传响应内容为空/, replacement: 'Upload response was empty' },
   { pattern: /图片下载失败：/, replacement: 'Image download failed: ' },
   { pattern: /上传图片 (\S+) 失败：/, replacement: 'Failed to upload image $1: ' },
   { pattern: /下载图片 (\S+) 失败：/, replacement: 'Failed to download image $1: ' },
