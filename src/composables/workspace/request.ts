@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { RequestError } from './types';
 import { t } from '../../i18n';
+import { localizeError } from '../../i18n/errorText';
 
 type LocalImageUpload = { key: string; name: string; data: string };
 
@@ -19,8 +20,11 @@ function parsePathId(path: string) {
 }
 
 function toRequestError(error: unknown): RequestError {
-  if (error instanceof Error) return error as RequestError;
-  const message = typeof error === 'string' && error ? error : t('msg.requestFailed');
+  if (error instanceof Error) {
+    error.message = localizeError(error.message);
+    return error as RequestError;
+  }
+  const message = typeof error === 'string' && error ? localizeError(error) : t('msg.requestFailed');
   return new Error(message) as RequestError;
 }
 

@@ -5,6 +5,7 @@ import { createClientId } from './api';
 import { isGithubImageURL, normalizeProxyURL, withGithubProxy } from './imageProxy';
 import type { BatchFile, ConversionRecord, ConversionTask, MarkdownImage, PicbedConfig } from './types';
 import { t } from '../../i18n';
+import { localizeError } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const CONVERT_WORKSPACE_STORAGE_KEY = 'picbed_convert_workspace';
@@ -174,7 +175,7 @@ export function useWorkspaceConvert({
       file.status = record.status === 'success' ? 'success' : 'failed';
       file.convertedContent = record.converted_content || '';
       file.changed = record.image_count || 0;
-      file.error = record.error_message || '';
+      file.error = localizeError(record.error_message || '');
     }
   }
   async function addMarkdownFiles(fileList: FileList | File[]) {

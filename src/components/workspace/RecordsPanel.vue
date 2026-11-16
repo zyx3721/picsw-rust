@@ -7,8 +7,10 @@ import { ChevronDown, Download, FileText, RefreshCw, Search, Trash2, X } from 'l
 import DateRangePanel from '../DateRangePanel.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import { t } from '../../i18n';
+import { localizeError } from '../../i18n/errorText';
 
 const { records, recordDetail, recordDetailOpen, typeLabel, showMessage, showError, loadRecords, openRecordDetail, closeRecordDetail, deleteRecords } = useWorkspaceContext();
+const recordDetailError = computed(() => localizeError(recordDetail.value?.error_message || ''));
 const selectedRecordIds = ref<number[]>([]);
 const deletingRecords = ref(false);
 const recordSearch = ref('');
@@ -435,7 +437,7 @@ function hideUrlTooltip() {
       </div>
     </div>
 
-    <p v-if="recordDetail.error_message" class="notice error record-detail-error">{{ recordDetail.error_message }}</p>
+    <p v-if="recordDetailError" class="notice error record-detail-error">{{ recordDetailError }}</p>
 
     <section class="record-detail-section">
       <div class="record-detail-section-head">

@@ -36,6 +36,11 @@ export function hasMessage(key: string): boolean {
   return key in (dictionaries[locale.value] as Record<string, string>);
 }
 
+/// 读取当前界面语言，供非组件模块选择文案
+export function getLocale(): Locale {
+  return locale.value;
+}
+
 /// 切换界面语言并持久化偏好
 export function setLocale(value: Locale) {
   locale.value = value;

@@ -4,6 +4,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import type { ConversionRecord, ConversionTask, LocalDocument, LocalImageFile, MarkdownImage, PicbedConfig } from './types';
 import { t } from '../../i18n';
+import { localizeError } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const LOCAL_UPLOAD_WORKSPACE_STORAGE_KEY = 'picbed_local_upload_workspace';
@@ -240,7 +241,7 @@ export function useWorkspaceLocalUpload({
       document.status = record.status === 'success' ? 'success' : 'failed';
       document.convertedContent = record.converted_content || '';
       document.changed = record.image_count || 0;
-      document.error = record.error_message || '';
+      document.error = localizeError(record.error_message || '');
     }
   }
   async function pollLocalUploadTask(taskId: number, initialDelay = 600) {
