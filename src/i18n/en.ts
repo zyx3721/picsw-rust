@@ -268,7 +268,7 @@ export const en: Record<keyof typeof zh, string> = {
   'dlg.task.progress': 'Progress {current} / {total}',
   'dlg.task.successCount': 'Success {count}',
   'dlg.task.failedCount': 'Failed {count}',
-  'dlg.task.backgroundHint': 'The task runs in the background; closing the window will not interrupt it.',
+  'dlg.task.backgroundHint': 'The task runs in the background; minimizing to tray won\'t interrupt it, but quitting the app will',
 
   'dlg.proxy.title': 'GitHub Image URLs Detected',
   'dlg.proxy.desc': 'The detected results include GitHub image file URLs; a proxy prefix can be added before conversion to help third-party services download them.',

@@ -266,7 +266,7 @@ export const zh = {
   'dlg.task.progress': '进度 {current} / {total}',
   'dlg.task.successCount': '成功 {count}',
   'dlg.task.failedCount': '失败 {count}',
-  'dlg.task.backgroundHint': '任务在后台执行，关闭窗口不会中断进度',
+  'dlg.task.backgroundHint': '任务在后台执行；最小化到托盘不会中断进度，退出应用会中断当前进度',
 
   'dlg.proxy.title': '检测到 GitHub 图床地址',
   'dlg.proxy.desc': '当前识别结果包含 GitHub 图片文件地址，可在转换前为这些地址添加代理前缀，便于第三方服务下载',
