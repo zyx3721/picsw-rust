@@ -29,13 +29,13 @@ pub fn encrypt_string(plaintext: &str) -> Result<String, String> {
 pub fn decrypt_string(ciphertext: &str) -> Result<String, String> {
     let raw = BASE64
         .decode(ciphertext.as_bytes())
-        .map_err(|_| "invalid ciphertext".to_string())?;
+        .map_err(|_| "配置密文无效".to_string())?;
     if raw.len() < 12 {
-        return Err("invalid ciphertext".to_string());
+        return Err("配置密文无效".to_string());
     }
     let cipher = Aes256Gcm::new_from_slice(&normalize_key()).map_err(|e| e.to_string())?;
     let plain = cipher
         .decrypt(Nonce::from_slice(&raw[..12]), &raw[12..])
-        .map_err(|_| "invalid ciphertext".to_string())?;
+        .map_err(|_| "配置密文无效".to_string())?;
     Ok(String::from_utf8_lossy(&plain).to_string())
 }

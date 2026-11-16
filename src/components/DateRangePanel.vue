@@ -96,7 +96,7 @@ function clearSelection() {
           <span class="date-range-nav-spacer"></span>
         </div>
         <div class="date-range-grid">
-          <span v-for="day in weekdays" :key="day" class="date-range-weekday">{{ day }}</span>
+          <span v-for="(day, index) in weekdays" :key="index" class="date-range-weekday">{{ day }}</span>
           <button
             v-for="date in monthGrid(leftMonth)"
             :key="formatKey(date)"
@@ -118,7 +118,7 @@ function clearSelection() {
           </div>
         </div>
         <div class="date-range-grid">
-          <span v-for="day in weekdays" :key="day" class="date-range-weekday">{{ day }}</span>
+          <span v-for="(day, index) in weekdays" :key="index" class="date-range-weekday">{{ day }}</span>
           <button
             v-for="date in monthGrid(rightMonth)"
             :key="formatKey(date)"

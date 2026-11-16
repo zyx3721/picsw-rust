@@ -9,14 +9,17 @@ const LOCALE_STORAGE_KEY = 'picbed_locale';
 const dictionaries: Record<Locale, Record<string, string>> = { zh, en };
 
 function readStoredLocale(): Locale {
-  return localStorage.getItem(LOCALE_STORAGE_KEY) === 'en' ? 'en' : 'zh';
+  const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+  if (stored === 'en' || stored === 'zh') return stored;
+  return navigator.language.toLowerCase().startsWith('zh') ? 'zh' : 'en';
 }
 
 const locale = ref<Locale>(readStoredLocale());
 
-/// 把当前语言同步到 <html lang>，供无障碍朗读与字体回退使用
+/// 把当前语言同步到 <html lang> 与文档标题，供无障碍朗读与窗口标题回退使用
 function applyDocumentLang(value: Locale) {
   document.documentElement.lang = value === 'zh' ? 'zh-CN' : 'en';
+  document.title = t('app.title');
 }
 
 /// 缺词时回退键名，便于发现遗漏；未注册键（如后端新增图床类型）由调用方自行兜底
@@ -39,6 +42,13 @@ export function hasMessage(key: string): boolean {
 /// 读取当前界面语言，供非组件模块选择文案
 export function getLocale(): Locale {
   return locale.value;
+}
+
+/// 按当前界面语言格式化日期时间，避免跟随系统语言产生混排
+export function formatDateTime(value: string | number | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US');
 }
 
 /// 切换界面语言并持久化偏好

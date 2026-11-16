@@ -1,11 +1,10 @@
 import { computed, reactive, ref, type Ref } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import { isGithubImageURL, normalizeProxyURL, withGithubProxy } from './imageProxy';
 import type { BatchFile, ConversionRecord, ConversionTask, MarkdownImage, PicbedConfig } from './types';
 import { t } from '../../i18n';
-import { localizeError } from '../../i18n/errorText';
+import { localizeBackendText } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const CONVERT_WORKSPACE_STORAGE_KEY = 'picbed_convert_workspace';
@@ -146,7 +145,7 @@ export function useWorkspaceConvert({
       current: taskProgressValue(task),
       success: task.success,
       failed: task.failed,
-      message: task.message || t('msg.convert.taskRunning'),
+      message: localizeBackendText(task.message) || t('msg.convert.taskRunning'),
     });
   }
   function applyTaskRecords(data: ConvertTaskData) {
@@ -175,7 +174,7 @@ export function useWorkspaceConvert({
       file.status = record.status === 'success' ? 'success' : 'failed';
       file.convertedContent = record.converted_content || '';
       file.changed = record.image_count || 0;
-      file.error = localizeError(record.error_message || '');
+      file.error = record.error_message || '';
     }
   }
   async function addMarkdownFiles(fileList: FileList | File[]) {
@@ -307,7 +306,7 @@ export function useWorkspaceConvert({
         const finalStatus = data.task.failed > 0 ? 'failed' : 'success';
         finishTaskProgress({
           status: finalStatus,
-          message: data.task.message || t('msg.convert.taskDone', { success: data.task.success, failed: data.task.failed }),
+          message: localizeBackendText(data.task.message) || t('msg.convert.taskDone', { success: data.task.success, failed: data.task.failed }),
           detail: t('msg.convert.taskDoneHint'),
         });
         showMessage(t('msg.convert.batchDone', { count: convertedCount.value }));
@@ -371,7 +370,7 @@ export function useWorkspaceConvert({
       const taskId = created.task.id;
       activeTaskId = taskId;
       persistConvertWorkspace(taskId);
-      updateTaskProgress({ message: created.task.message || t('msg.convert.taskQueued'), current: 0, success: 0, failed: 0 });
+      updateTaskProgress({ message: localizeBackendText(created.task.message) || t('msg.convert.taskQueued'), current: 0, success: 0, failed: 0 });
       await pollConvertTask(taskId);
     } catch (err) {
       persistConvertWorkspace(activeTaskId);
@@ -388,23 +387,37 @@ export function useWorkspaceConvert({
   }
   async function downloadFile(file: BatchFile) {
     if (!file.convertedContent) return;
-    const targetPath = await save({
-      defaultPath: file.filename || 'converted.md',
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
-    });
-    if (!targetPath) return;
-    await invoke('write_text_file', { path: targetPath, content: file.convertedContent });
-    showMessage(t('msg.convert.saved'));
+    try {
+      const targetPath = await save({
+        defaultPath: file.filename || 'converted.md',
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
+      });
+      if (!targetPath) return;
+      await request('/api/files/write', {
+        method: 'POST',
+        body: JSON.stringify({ path: targetPath, content: file.convertedContent }),
+      });
+      showMessage(t('msg.convert.saved'));
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('records.saveFailed'));
+    }
   }
   async function downloadAll() {
     const targets = batchFiles.value.filter(file => file.convertedContent);
     if (!targets.length) return;
-    const directory = await open({ directory: true, title: t('msg.chooseSaveDir'), multiple: false });
-    if (typeof directory !== 'string' || !directory) return;
-    for (const file of targets) {
-      await invoke('write_text_file', { path: `${directory}/${file.filename || 'converted.md'}`, content: file.convertedContent });
+    try {
+      const directory = await open({ directory: true, title: t('msg.chooseSaveDir'), multiple: false });
+      if (typeof directory !== 'string' || !directory) return;
+      for (const file of targets) {
+        await request('/api/files/write', {
+          method: 'POST',
+          body: JSON.stringify({ path: `${directory}/${file.filename || 'converted.md'}`, content: file.convertedContent }),
+        });
+      }
+      showMessage(t('msg.convert.savedCount', { count: targets.length }));
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('records.saveFailed'));
     }
-    showMessage(t('msg.convert.savedCount', { count: targets.length }));
   }
   function togglePreview(file: BatchFile) {
     file.previewOpen = !file.previewOpen;

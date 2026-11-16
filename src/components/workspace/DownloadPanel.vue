@@ -3,6 +3,7 @@ import { DownloadCloud, FileSearch, FolderOpen, Trash2, UploadCloud } from 'luci
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import { t } from '../../i18n';
+import { localizeError } from '../../i18n/errorText';
 
 const {
   loading,
@@ -50,8 +51,8 @@ const {
         <div class="row-info">
           <strong>{{ item.filename }}</strong
           ><span>{{ statusLabel(item.status) }} · {{ t('download.remoteImages', { count: item.images.length }) }}</span
-          ><AppTooltip v-if="item.error" :label="item.error" wrap>
-            <small class="error-tip-text">{{ item.error }}</small>
+          ><AppTooltip v-if="item.error" :label="localizeError(item.error)" wrap>
+            <small class="error-tip-text">{{ localizeError(item.error) }}</small>
           </AppTooltip>
         </div>
         <div class="row-actions">
@@ -87,8 +88,8 @@ const {
           <AppTooltip :label="image.url" wrap>
             <span>{{ image.url }}</span>
           </AppTooltip>
-          <AppTooltip v-if="image.error" :label="image.error" wrap>
-            <small class="error-tip-text">{{ image.error }}</small>
+          <AppTooltip v-if="image.error" :label="localizeError(image.error)" wrap>
+            <small class="error-tip-text">{{ localizeError(image.error) }}</small>
           </AppTooltip>
         </div>
         <small>{{ typeLabel(image.picbed) }}</small>

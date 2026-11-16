@@ -1,15 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { save } from '@tauri-apps/plugin-dialog';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { ChevronDown, Download, FileText, RefreshCw, Search, Trash2, X } from 'lucide-vue-next';
 import DateRangePanel from '../DateRangePanel.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
-import { t } from '../../i18n';
+import { formatDateTime, t } from '../../i18n';
 import { localizeError } from '../../i18n/errorText';
 
-const { records, recordDetail, recordDetailOpen, typeLabel, showMessage, showError, loadRecords, openRecordDetail, closeRecordDetail, deleteRecords } = useWorkspaceContext();
+const { request, records, recordDetail, recordDetailOpen, typeLabel, showMessage, showError, loadRecords, openRecordDetail, closeRecordDetail, deleteRecords } = useWorkspaceContext();
 const recordDetailError = computed(() => localizeError(recordDetail.value?.error_message || ''));
 const selectedRecordIds = ref<number[]>([]);
 const deletingRecords = ref(false);
@@ -64,7 +63,7 @@ const filteredRecords = computed(() => {
       record.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed'),
       record.status,
       String(record.image_count),
-      new Date(record.created_at).toLocaleString(),
+      formatDateTime(record.created_at),
       record.details?.map(detail => `${detail.original_url}\n${detail.target_url}`).join('\n') || '',
     ]
       .join('\n')
@@ -189,7 +188,10 @@ async function downloadRecordContent() {
   });
   if (!targetPath) return;
   try {
-    await invoke('write_text_file', { path: targetPath, content });
+    await request('/api/files/write', {
+      method: 'POST',
+      body: JSON.stringify({ path: targetPath, content }),
+    });
     showMessage(t('records.convertedSaved'));
   } catch (err) {
     showError(err instanceof Error ? err.message : t('records.saveFailed'));
@@ -396,7 +398,7 @@ function hideUrlTooltip() {
             }}</span>
           </td>
           <td>{{ record.image_count }}</td>
-          <td>{{ new Date(record.created_at).toLocaleString() }}</td>
+          <td>{{ formatDateTime(record.created_at) }}</td>
         </tr>
       </tbody>
     </table>

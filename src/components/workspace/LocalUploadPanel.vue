@@ -3,6 +3,7 @@ import { ChevronDown, Download, FileSearch, ImagePlus, Trash2, UploadCloud, Wand
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import { t } from '../../i18n';
+import { localizeError } from '../../i18n/errorText';
 
 const {
   loading,
@@ -66,11 +67,11 @@ const {
           ><span
             >{{ localStatusLabel(item.status) }} ·
             {{ t('local.refsMatched', { refs: item.references.length, matched: item.matched }) }}</span
-          ><AppTooltip v-if="item.missing.length" :label="t('local.missingList', { list: item.missing.join('、') })" wrap>
-            <small class="error-tip-text">{{ t('local.missingList', { list: item.missing.join('、') }) }}</small>
+          ><AppTooltip v-if="item.missing.length" :label="t('local.missingList', { list: item.missing.join(t('common.listSeparator')) })" wrap>
+            <small class="error-tip-text">{{ t('local.missingList', { list: item.missing.join(t('common.listSeparator')) }) }}</small>
           </AppTooltip>
-          <AppTooltip v-else-if="item.error" :label="item.error" wrap>
-            <small class="error-tip-text">{{ item.error }}</small>
+          <AppTooltip v-else-if="item.error" :label="localizeError(item.error)" wrap>
+            <small class="error-tip-text">{{ localizeError(item.error) }}</small>
           </AppTooltip>
         </div>
         <div class="row-actions">

@@ -95,8 +95,8 @@ export function useWorkspaceConfigActions({
     loading.value = true;
     try {
       if (config) {
-        const data = await request<{ message: string }>(`/api/picbed/configs/${config.id}/test`, { method: 'POST' });
-        showMessage(data.message || t('msg.config.testPassed'));
+        await request<{ message: string }>(`/api/picbed/configs/${config.id}/test`, { method: 'POST' });
+        showMessage(t('msg.config.testPassed'));
         return;
       }
       if (!validateConfigForm()) return;
@@ -110,8 +110,8 @@ export function useWorkspaceConfigActions({
           return values;
         }, {} as Record<string, string>),
       };
-      const data = await request<{ message: string }>('/api/picbed/configs/test', { method: 'POST', body: JSON.stringify(payload) });
-      showMessage(data.message || t('msg.config.testPassed'));
+      await request<{ message: string }>('/api/picbed/configs/test', { method: 'POST', body: JSON.stringify(payload) });
+      showMessage(t('msg.config.testPassed'));
     } catch (err) {
       showError(err instanceof Error ? err.message : t('msg.config.testFailed'));
     } finally {

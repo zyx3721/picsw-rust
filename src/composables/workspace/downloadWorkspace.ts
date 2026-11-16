@@ -3,7 +3,6 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import type { DownloadDocument, DownloadImageItem, DownloadImageResult, MarkdownImage } from './types';
 import { t } from '../../i18n';
-import { localizeError } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
@@ -163,7 +162,7 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
         const item = downloadItems.value[index];
         if (!item) return;
         item.status = result.status === 'success' ? 'success' : 'failed';
-        item.error = localizeError(result.error || '');
+        item.error = result.error || '';
         item.savedPath = result.saved_path || '';
       });
       const failed = results.filter(result => result.status !== 'success').length;

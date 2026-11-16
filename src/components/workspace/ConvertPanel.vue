@@ -3,6 +3,7 @@ import { ChevronDown, Download, Eye, FileSearch, Plus, Trash2, UploadCloud, Wand
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import { t } from '../../i18n';
+import { localizeError } from '../../i18n/errorText';
 
 const {
   loading,
@@ -76,8 +77,8 @@ const {
           ><span
             >{{ statusLabel(file.status) }} ·
             {{ t('convert.imagesReplaced', { images: file.images.length, changed: file.changed }) }}</span
-          ><AppTooltip v-if="file.error" :label="file.error" wrap>
-            <small class="error-tip-text">{{ file.error }}</small>
+          ><AppTooltip v-if="file.error" :label="localizeError(file.error)" wrap>
+            <small class="error-tip-text">{{ localizeError(file.error) }}</small>
           </AppTooltip>
         </div>
         <div class="row-actions">

@@ -333,13 +333,13 @@ export function usePicbedWorkspace() {
     if (uniqueIds.length === 0) return;
     loading.value = true;
     try {
-      const data = await request<{ message: string }>('/api/convert/records', {
+      await request<{ message: string }>('/api/convert/records', {
         method: 'DELETE',
         body: JSON.stringify({ ids: uniqueIds }),
       });
       if (recordDetail.value && uniqueIds.includes(recordDetail.value.id)) closeRecordDetail();
       records.value = records.value.filter(record => !uniqueIds.includes(record.id));
-      showMessage(data.message || t('msg.records.deleted', { count: uniqueIds.length }));
+      showMessage(t('msg.records.deleted', { count: uniqueIds.length }));
       await loadRecords();
     } catch (err) {
       showError(err instanceof Error ? err.message : t('msg.records.deleteFailed'));
@@ -370,6 +370,7 @@ export function usePicbedWorkspace() {
     toast,
     toastKind,
     toastNoticeKey,
+    request,
     loading,
     taskProgress,
     closeTaskProgress,

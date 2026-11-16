@@ -52,12 +52,12 @@ pub fn run() {
             app.manage(AppState { db: Mutex::new(conn), queue: sender });
             task_queue::start_workers(app.handle().clone(), receiver);
 
-            let show_item = MenuItem::with_id(app, "show", "显示窗口", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出应用", true, None::<&str>)?;
+            let show_item = MenuItem::with_id(app, "show", "显示窗口 / Show Window", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出应用 / Quit", true, None::<&str>)?;
             let tray_menu = Menu::with_items(app, &[&show_item, &quit_item])?;
             TrayIconBuilder::with_id("main-tray")
                 .icon(app.default_window_icon().expect("default window icon").clone())
-                .tooltip("图床转站助手")
+                .tooltip("图床转站助手 / PicBed Switcher")
                 .menu(&tray_menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {

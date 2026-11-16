@@ -141,9 +141,9 @@ export function useWorkspaceConfigForm({ activeTab, configs, showError, clearNot
     });
     if (missing.length || invalid.length) {
       const parts = [];
-      if (missing.length) parts.push(t('msg.config.missingFields', { fields: missing.join('、') }));
-      if (invalid.length) parts.push(invalid.join('、'));
-      showError(parts.join('；'));
+      if (missing.length) parts.push(t('msg.config.missingFields', { fields: missing.join(t('common.listSeparator')) }));
+      if (invalid.length) parts.push(invalid.join(t('common.listSeparator')));
+      showError(parts.join(t('common.errorSeparator')));
       return false;
     }
     return true;

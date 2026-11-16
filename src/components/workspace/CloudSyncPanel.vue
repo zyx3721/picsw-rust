@@ -388,7 +388,7 @@ function submitUnlock() {
                   {{ t('syncHistory.previewConfigs', { current: revisionPreview.currentCount, target: revisionPreview.configCount }) }}<template v-if="revisionShrink > 0"><span class="sync-preview-shrink">{{ t('syncHistory.previewShrink', { count: revisionShrink }) }}</span></template>
                 </p>
                 <p>
-                  {{ t('syncHistory.previewSource', { version: revisionPreview.version }) }}<template v-if="revisionPreview.deviceName"> · {{ revisionPreview.deviceName }}</template><template v-if="revisionPreview.appVersion">（{{ revisionPreview.appVersion }}）</template> · {{ t('syncHistory.previewDataTime', { time: revisionPreview.updatedAtText }) }}
+                  {{ t('syncHistory.previewSource', { version: revisionPreview.version }) }}<template v-if="revisionPreview.deviceName"> · {{ revisionPreview.deviceName }}</template><template v-if="revisionPreview.appVersion">{{ t('syncHistory.previewAppVersion', { version: revisionPreview.appVersion }) }}</template> · {{ t('syncHistory.previewDataTime', { time: revisionPreview.updatedAtText }) }}
                 </p>
                 <p class="sync-history-preview-note">{{ t('syncHistory.previewNote') }}</p>
               </div>

@@ -2,7 +2,7 @@
 /// 字节布局与 Rust 加密层完全一致（存量云端密文可直接解密），解密走浏览器原生实现
 import { t } from '../../i18n';
 const PBKDF2_ITERATIONS = 600_000;
-/// 新加密对齐 dockpilot 使用 32 字节盐；解密不校验盐长，历史 16 字节盐密文同样可解
+/// 新加密使用 32 字节盐；解密不校验盐长，历史 16 字节盐密文同样可解
 const SALT_LENGTH = 32;
 const IV_LENGTH = 12;
 const textEncoder = new TextEncoder();
@@ -53,7 +53,7 @@ export async function encryptWithPassword(plaintext: string, password: string): 
   return { iv: bytesToBase64(iv), salt: bytesToBase64(salt), payload: bytesToBase64(sealed) };
 }
 
-/// 分立式解密（对照 dockpilot：不校验盐长等格式细节，密码或格式错误统一由 GCM 认证失败兜底）
+/// 分立式解密：不校验盐长等格式细节，密码或格式错误统一由 GCM 认证失败兜底
 export async function decryptWithPasswordParts(
   payload: string,
   password: string,

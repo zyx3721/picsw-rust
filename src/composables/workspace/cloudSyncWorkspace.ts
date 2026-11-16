@@ -1,6 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue';
 import { getVersion } from '@tauri-apps/api/app';
-import { invoke } from '@tauri-apps/api/core';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import type { PicbedConfig, RemoteConfigPreview, SyncRemoteState } from './types';
 import { decryptWithPasswordEmbedded, decryptWithPasswordParts, encryptWithPassword } from './syncCrypto';
@@ -485,7 +484,10 @@ export function useWorkspaceCloudSync({
     const user = (await githubFetch('/user')) as { login?: string; name?: string | null };
     // 优先展示 GitHub 资料名（Name），未设置时回退用户名（login）
     const displayName = (user.name || '').trim() || user.login || t('msg.sync.unknownAccount');
-    const backend = await invoke<string>('sync_save_credential', { plaintext: token });
+    const backend = await request<string>('/api/sync/credential', {
+      method: 'POST',
+      body: JSON.stringify({ plaintext: token }),
+    });
     localStorage.setItem(SECRET_BACKEND_STORAGE_KEY, backend);
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.setItem(ACCOUNT_STORAGE_KEY, displayName);
@@ -512,13 +514,16 @@ export function useWorkspaceCloudSync({
         return;
       }
       const session = ++deviceFlowSession;
-      const start = await invoke<{
+      const start = await request<{
         device_code: string;
         user_code: string;
         verification_uri: string;
         expires_at: number;
         interval: number;
-      }>('github_device_flow_start', { clientId: syncClientId.value, scope: 'gist read:user' });
+      }>('/api/sync/github-device-flow/start', {
+        method: 'POST',
+        body: JSON.stringify({ client_id: syncClientId.value, scope: 'gist read:user' }),
+      });
       if (session !== deviceFlowSession) return;
       deviceFlowUserCode.value = start.user_code.toUpperCase();
       deviceFlowStatus.value = 'pending';
@@ -544,9 +549,9 @@ export function useWorkspaceCloudSync({
       if (session !== deviceFlowSession) return;
       let result: Record<string, unknown> | null = null;
       try {
-        result = await invoke<Record<string, unknown>>('github_device_flow_poll', {
-          clientId: syncClientId.value,
-          deviceCode: start.device_code,
+        result = await request<Record<string, unknown>>('/api/sync/github-device-flow/poll', {
+          method: 'POST',
+          body: JSON.stringify({ client_id: syncClientId.value, device_code: start.device_code }),
         });
       } catch {
         result = null;
@@ -616,7 +621,7 @@ export function useWorkspaceCloudSync({
     const backend = localStorage.getItem(SECRET_BACKEND_STORAGE_KEY);
     if (backend) {
       try {
-        await invoke('sync_delete_credential', { backend });
+        await request('/api/sync/credential', { method: 'DELETE', body: JSON.stringify({ backend }) });
       } catch {
         // 清理尽力而为：钥匙串删除失败不阻断断开流程
       }
@@ -793,9 +798,15 @@ export function useWorkspaceCloudSync({
     let token = '';
     try {
       if (backend) {
-        token = (await invoke<string | null>('sync_load_credential', { backend })) || '';
+        token = (await request<string | null>('/api/sync/credential/load', {
+          method: 'POST',
+          body: JSON.stringify({ backend }),
+        })) || '';
       } else if (legacyCiphertext) {
-        token = await invoke<string>('sync_load_legacy_credential', { ciphertext: legacyCiphertext });
+        token = await request<string>('/api/sync/legacy-credential', {
+          method: 'POST',
+          body: JSON.stringify({ ciphertext: legacyCiphertext }),
+        });
       }
     } catch {
       return;
@@ -808,7 +819,10 @@ export function useWorkspaceCloudSync({
       secretBackend.value = backend;
     } else {
       try {
-        const savedBackend = await invoke<string>('sync_save_credential', { plaintext: token });
+        const savedBackend = await request<string>('/api/sync/credential', {
+          method: 'POST',
+          body: JSON.stringify({ plaintext: token }),
+        });
         localStorage.setItem(SECRET_BACKEND_STORAGE_KEY, savedBackend);
         localStorage.removeItem(TOKEN_STORAGE_KEY);
         secretBackend.value = savedBackend;

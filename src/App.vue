@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { provideWorkspace } from './composables/useWorkspaceContext';
 import { CircleCheck, CircleX, X } from 'lucide-vue-next';
 import { usePicbedWorkspace } from './composables/usePicbedWorkspace';
-import { t } from './i18n';
+import { t, useI18n } from './i18n';
 import CloseConfirmDialog from './components/dialogs/CloseConfirmDialog.vue';
 import DeleteConfigDialog from './components/dialogs/DeleteConfigDialog.vue';
 import GithubProxyDialog from './components/dialogs/GithubProxyDialog.vue';
@@ -22,6 +22,11 @@ import AboutPanel from './components/workspace/AboutPanel.vue';
 import WorkspaceHeader from './components/workspace/WorkspaceHeader.vue';
 import WorkspaceTabs from './components/workspace/WorkspaceTabs.vue';
 import type { CloseAction } from './composables/workspace/closeBehavior';
+
+const { locale } = useI18n();
+watch(locale, () => {
+  void getCurrentWindow().setTitle(t('app.title')).catch(() => undefined);
+}, { immediate: true });
 
 const closeConfirmOpen = ref(false);
 let unlistenCloseRequested: (() => void) | undefined;
@@ -75,6 +80,7 @@ const {
   toast,
   toastKind,
   toastNoticeKey,
+  request,
   loading,
   showMessage,
   showError,
@@ -265,7 +271,7 @@ analyzeBatch,
 } = usePicbedWorkspace();
 
 provideWorkspace({
-  activeTab, toast, toastKind, toastNoticeKey, loading, showMessage, showError,
+  activeTab, toast, toastKind, toastNoticeKey, request, loading, showMessage, showError,
   taskProgress,
   closeTaskProgress,
   configForm, configErrors, convertForm, pasteForm, configs, records, recordDetail, recordDetailOpen, batchFiles, deleteTarget,

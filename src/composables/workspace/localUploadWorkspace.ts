@@ -1,10 +1,9 @@
 import { computed, ref, type Ref } from 'vue';
-import { invoke } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import type { ConversionRecord, ConversionTask, LocalDocument, LocalImageFile, MarkdownImage, PicbedConfig } from './types';
 import { t } from '../../i18n';
-import { localizeError } from '../../i18n/errorText';
+import { localizeBackendText } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const LOCAL_UPLOAD_WORKSPACE_STORAGE_KEY = 'picbed_local_upload_workspace';
@@ -214,7 +213,7 @@ export function useWorkspaceLocalUpload({
       current: taskProgressValue(task),
       success: task.success,
       failed: task.failed,
-      message: task.message || t('msg.local.taskRunning'),
+      message: localizeBackendText(task.message) || t('msg.local.taskRunning'),
     });
   }
   function applyLocalTaskRecords(data: LocalTaskData) {
@@ -241,7 +240,7 @@ export function useWorkspaceLocalUpload({
       document.status = record.status === 'success' ? 'success' : 'failed';
       document.convertedContent = record.converted_content || '';
       document.changed = record.image_count || 0;
-      document.error = localizeError(record.error_message || '');
+      document.error = record.error_message || '';
     }
   }
   async function pollLocalUploadTask(taskId: number, initialDelay = 600) {
@@ -261,7 +260,7 @@ export function useWorkspaceLocalUpload({
         const finalStatus = data.task.failed > 0 ? 'failed' : 'success';
         finishTaskProgress({
           status: finalStatus,
-          message: data.task.message || t('msg.local.taskDone', { success: data.task.success, failed: data.task.failed }),
+          message: localizeBackendText(data.task.message) || t('msg.local.taskDone', { success: data.task.success, failed: data.task.failed }),
           detail: t('msg.local.taskDoneHint'),
         });
         showMessage(t('msg.local.batchDone', { count: localConvertedCount.value }));
@@ -311,7 +310,7 @@ export function useWorkspaceLocalUpload({
       activeLocalTaskId = taskId;
       persistLocalUploadWorkspace(taskId);
       localImages.value = [];
-      updateTaskProgress({ message: created.task.message || t('msg.local.taskQueued'), current: 0, success: 0, failed: 0 });
+      updateTaskProgress({ message: localizeBackendText(created.task.message) || t('msg.local.taskQueued'), current: 0, success: 0, failed: 0 });
       await pollLocalUploadTask(taskId);
     } catch (err) {
       persistLocalUploadWorkspace(activeLocalTaskId);
@@ -328,23 +327,37 @@ export function useWorkspaceLocalUpload({
   }
   async function downloadLocalFile(item: LocalDocument) {
     if (!item.convertedContent) return;
-    const targetPath = await save({
-      defaultPath: item.filename || 'converted.md',
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
-    });
-    if (!targetPath) return;
-    await invoke('write_text_file', { path: targetPath, content: item.convertedContent });
-    showMessage(t('msg.local.saved'));
+    try {
+      const targetPath = await save({
+        defaultPath: item.filename || 'converted.md',
+        filters: [{ name: 'Markdown', extensions: ['md'] }],
+      });
+      if (!targetPath) return;
+      await request('/api/files/write', {
+        method: 'POST',
+        body: JSON.stringify({ path: targetPath, content: item.convertedContent }),
+      });
+      showMessage(t('msg.local.saved'));
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('records.saveFailed'));
+    }
   }
   async function downloadAllLocalFiles() {
     const targets = localDocuments.value.filter(document => document.convertedContent);
     if (!targets.length) return;
-    const directory = await open({ directory: true, title: t('msg.chooseSaveDir'), multiple: false });
-    if (typeof directory !== 'string' || !directory) return;
-    for (const document of targets) {
-      await invoke('write_text_file', { path: `${directory}/${document.filename || 'converted.md'}`, content: document.convertedContent });
+    try {
+      const directory = await open({ directory: true, title: t('msg.chooseSaveDir'), multiple: false });
+      if (typeof directory !== 'string' || !directory) return;
+      for (const document of targets) {
+        await request('/api/files/write', {
+          method: 'POST',
+          body: JSON.stringify({ path: `${directory}/${document.filename || 'converted.md'}`, content: document.convertedContent }),
+        });
+      }
+      showMessage(t('msg.local.savedCount', { count: targets.length }));
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('records.saveFailed'));
     }
-    showMessage(t('msg.local.savedCount', { count: targets.length }));
   }
   function restoreLocalUploadWorkspace() {
     const state = readPersistedLocalUploadWorkspace();

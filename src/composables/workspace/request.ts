@@ -71,10 +71,24 @@ export function createWorkspaceRequest() {
           return await invoke<T>('create_config', { req: body });
         case 'POST /api/picbed/configs/test':
           return await invoke<T>('test_config_draft', { req: body });
+        case 'POST /api/files/write':
+          return await invoke<T>('write_text_file', { path: body.path || '', content: body.content || '' });
         case 'GET /api/convert/records':
           return await invoke<T>('list_records');
         case 'GET /api/sync/github-client-id':
           return await invoke<T>('sync_github_client_id');
+        case 'POST /api/sync/credential':
+          return await invoke<T>('sync_save_credential', { plaintext: body.plaintext || '' });
+        case 'POST /api/sync/credential/load':
+          return await invoke<T>('sync_load_credential', { backend: body.backend || '' });
+        case 'POST /api/sync/legacy-credential':
+          return await invoke<T>('sync_load_legacy_credential', { ciphertext: body.ciphertext || '' });
+        case 'POST /api/sync/github-device-flow/start':
+          return await invoke<T>('github_device_flow_start', { clientId: body.client_id || '', scope: body.scope || null });
+        case 'POST /api/sync/github-device-flow/poll':
+          return await invoke<T>('github_device_flow_poll', { clientId: body.client_id || '', deviceCode: body.device_code || '' });
+        case 'DELETE /api/sync/credential':
+          return await invoke<T>('sync_delete_credential', { backend: body.backend || '' });
         case 'POST /api/sync/password-credential':
           return await invoke<T>('sync_save_sync_password', { plaintext: body.password || '' });
         case 'POST /api/sync/password-credential/load':
