@@ -14,9 +14,12 @@ const {
   syncBusy,
   syncConnected,
   syncTokenInvalid,
+  syncLastError,
+  syncRemoteState,
   localConfigCount,
   syncStatusBadge,
   remoteVersionBadge,
+  remoteVersionBadgeStale,
   lastSyncText,
   canSyncNow,
   syncNow,
@@ -326,8 +329,12 @@ function submitUnlock() {
         <div class="sync-status-line">
           <div class="sync-status-title">
             <strong>{{ t('sync.statusTitle') }}</strong>
-            <span class="sync-status-badge" :data-kind="syncStatusBadge.kind">{{ syncStatusBadge.text }}</span>
-            <span v-if="remoteVersionBadge" class="sync-status-badge version">{{ remoteVersionBadge }}</span>
+            <AppTooltip :label="syncLastError" center>
+              <span class="sync-status-badge" :data-kind="syncStatusBadge.kind">{{ syncStatusBadge.text }}</span>
+            </AppTooltip>
+            <AppTooltip v-if="remoteVersionBadge" :label="remoteVersionBadgeStale ? t('sync.versionBadgeTip') : ''" center>
+              <span class="sync-status-badge version" :class="{ stale: remoteVersionBadgeStale }">{{ remoteVersionBadge }}</span>
+            </AppTooltip>
           </div>
           <span class="sync-status-sub">{{ lastSyncText }}</span>
         </div>
@@ -403,7 +410,7 @@ function submitUnlock() {
               type="button"
               :disabled="!revisionPreview || revisionPreviewLoading || restoringRevision || syncBusy"
               @click="handleRestoreClick"
-            >{{ restoringRevision ? t('syncHistory.restoring') : restoreConfirmArmed ? t('syncHistory.confirmRestore', { version: remoteVersionBadge || 'v?' }) : t('syncHistory.restore') }}</button>
+            >{{ restoringRevision ? t('syncHistory.restoring') : restoreConfirmArmed ? t('syncHistory.confirmRestore', { version: syncRemoteState?.version ? `v${syncRemoteState.version}` : 'v?' }) : t('syncHistory.restore') }}</button>
           </div>
         </section>
       </div>

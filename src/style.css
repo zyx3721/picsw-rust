@@ -933,6 +933,10 @@ svg {
   color: #475569;
   font-family: ui-monospace, SFMono-Regular, Consolas, 'Liberation Mono', monospace;
 }
+.sync-status-badge.version.stale {
+  background: #fef3c7;
+  color: #b45309;
+}
 .sync-status-sub {
   color: var(--muted);
   font-size: 12px;
@@ -3073,6 +3077,10 @@ html.dark .sync-status-badge[data-kind='muted'] {
 html.dark .sync-status-badge.version {
   background: rgba(148, 163, 184, 0.14);
   color: #b6c2d4;
+}
+html.dark .sync-status-badge.version.stale {
+  background: rgba(251, 191, 36, 0.14);
+  color: #fbbf24;
 }
 html.dark .sync-state-tag.warn {
   background: rgba(251, 191, 36, 0.14);

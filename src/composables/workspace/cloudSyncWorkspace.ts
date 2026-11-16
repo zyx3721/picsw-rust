@@ -68,6 +68,25 @@ export type SyncHistoryItem = {
 };
 export type SyncStatusBadge = { text: string; kind: 'ok' | 'busy' | 'warn' | 'danger' | 'muted' };
 
+/// 仅保留配置中的字符串值，剔除 masked 等脱敏标记，避免写库时类型不匹配
+function sanitizeConfigMap(config: Record<string, unknown> | undefined): Record<string, string> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(config || {})) {
+    if (typeof value === 'string') values[key] = value;
+  }
+  return values;
+}
+
+/// 归一化同步配置项：本机与远端都只保留真实配置字段，保证指纹与合并口径一致
+function normalizeSyncItem(item: RemoteConfigPreview): RemoteConfigPreview {
+  return {
+    picbed_type: item.picbed_type,
+    config_name: item.config_name,
+    is_default: item.is_default,
+    config: sanitizeConfigMap(item.config as Record<string, unknown>),
+  };
+}
+
 function sleep(ms: number) {
   return new Promise(resolve => window.setTimeout(resolve, ms));
 }
@@ -173,6 +192,7 @@ export function useWorkspaceCloudSync({
   const syncBanner = ref<SyncBanner | null>(null);
   const secretBackend = ref(localStorage.getItem(SECRET_BACKEND_STORAGE_KEY) || '');
   const syncTokenInvalid = ref(false);
+  const syncLastError = ref('');
   const initialLastSync = (() => {
     try {
       return JSON.parse(localStorage.getItem(LAST_SYNC_STORAGE_KEY) || '') as { at: number; version: number };
@@ -291,6 +311,7 @@ export function useWorkspaceCloudSync({
   async function commitLastSync(version: number) {
     lastSyncAt.value = Date.now();
     lastSyncVersion.value = version;
+    syncLastError.value = '';
     localStorage.setItem(LAST_SYNC_STORAGE_KEY, JSON.stringify({ at: lastSyncAt.value, version }));
   }
 
@@ -336,14 +357,23 @@ export function useWorkspaceCloudSync({
     if (syncBanner.value?.kind === 'conflict') return { text: t('sync.badgeConflict'), kind: 'danger' };
     if (syncBanner.value?.kind === 'blocked') return { text: t('sync.badgeBlocked'), kind: 'danger' };
     if (syncBanner.value?.kind === 'empty') return { text: t('sync.badgeRestore'), kind: 'warn' };
+    if (syncConnected.value && syncLastError.value) return { text: t('sync.badgeFailed'), kind: 'danger' };
     if (!syncConnected.value) return { text: t('sync.badgeReady'), kind: 'muted' };
     return { text: t('sync.badgeReady'), kind: 'ok' };
   });
-  /// 云端版本徽章：显示上次成功同步的版本号，未同步过或已断开时不显示
+  /// 云端版本徽章：本机已落后时显示「本机 → 云端」，否则显示上次同步版本
   const remoteVersionBadge = computed(() => {
-    const version = lastSyncVersion.value;
-    return version > 0 ? `v${version}` : '';
+    const localVersion = lastSyncVersion.value;
+    const remoteVersion = syncRemoteState.value?.version || 0;
+    if (localVersion > 0 && remoteVersion > localVersion) {
+      return t('sync.versionBadgeTransition', { local: localVersion, remote: remoteVersion });
+    }
+    if (localVersion > 0) return `v${localVersion}`;
+    return remoteVersion > 0 ? t('sync.versionBadgeRemote', { version: remoteVersion }) : '';
   });
+  const remoteVersionBadgeStale = computed(
+    () => (syncRemoteState.value?.version || 0) > lastSyncVersion.value
+  );
   const lastSyncText = computed(() => {
     const at = lastSyncAt.value;
     return at > 0 ? t('sync.lastSyncAt', { when: formatRelativeTime(at) }) : t('sync.lastSyncAt', { when: t('sync.neverSynced') });
@@ -459,6 +489,16 @@ export function useWorkspaceCloudSync({
     };
   }
 
+  /// 尽力解析修订文件的版本信息，失败时返回 null 以便继续展示修订列表
+  function tryParseVault(content?: string, truncated?: boolean) {
+    if (!content || truncated) return null;
+    try {
+      return parseVault(content);
+    } catch {
+      return null;
+    }
+  }
+
   async function connectGithub() {
     const pat = syncPatInput.value.trim();
     if (!pat) {
@@ -494,6 +534,7 @@ export function useWorkspaceCloudSync({
     secretBackend.value = backend;
     syncAccount.value = displayName;
     syncTokenInvalid.value = false;
+    syncLastError.value = '';
     showMessage(t('msg.sync.connected', { account: displayName }));
     await refreshRemoteState();
     if (passwordStatus.value === 'unlocked') void syncNow(true);
@@ -636,6 +677,7 @@ export function useWorkspaceCloudSync({
     secretBackend.value = '';
     syncAccount.value = '';
     syncTokenInvalid.value = false;
+    syncLastError.value = '';
     syncRemoteState.value = null;
     syncBanner.value = null;
     lastSyncAt.value = 0;
@@ -782,6 +824,7 @@ export function useWorkspaceCloudSync({
     secretBackend.value = '';
     syncAccount.value = '';
     syncTokenInvalid.value = false;
+    syncLastError.value = '';
     syncRemoteState.value = null;
     syncBanner.value = null;
   }
@@ -856,6 +899,7 @@ export function useWorkspaceCloudSync({
       syncAccount.value = (user.name || '').trim() || user.login || syncAccount.value || t('sync.connectedTag');
       localStorage.setItem(ACCOUNT_STORAGE_KEY, syncAccount.value);
       syncTokenInvalid.value = false;
+      syncLastError.value = '';
       verified = true;
     } catch (error) {
       showError(error instanceof Error ? error.message : t('msg.sync.revalidateFailed'));
@@ -868,11 +912,16 @@ export function useWorkspaceCloudSync({
     if (passwordStatus.value === 'unlocked') void syncNow(true);
   }
 
+  /// 与配置顺序无关的内容指纹：按配置名排序后序列化，并剔除脱敏标记
   function fingerprintOf(items: RemoteConfigPreview[]) {
-    // 与配置顺序无关的内容指纹：按配置名排序后序列化
     return JSON.stringify(
       items
-        .map(item => [item.picbed_type, item.config_name, item.is_default, item.config])
+        .map(item => [
+          item.picbed_type,
+          item.config_name,
+          item.is_default,
+          sanitizeConfigMap(item.config as Record<string, unknown>),
+        ])
         .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
     );
   }
@@ -882,7 +931,7 @@ export function useWorkspaceCloudSync({
       picbed_type: config.picbed_type,
       config_name: config.config_name,
       is_default: config.is_default,
-      config: (config.config || {}) as Record<string, string>,
+      config: sanitizeConfigMap(config.config as Record<string, unknown>),
     };
   }
 
@@ -892,7 +941,7 @@ export function useWorkspaceCloudSync({
       ? await decryptWithPasswordParts(vault.payload, password, vault.iv, vault.salt)
       : await decryptWithPasswordEmbedded(vault.payload, password);
     const parsed = JSON.parse(plaintext) as { configs?: RemoteConfigPreview[] };
-    return parsed.configs || [];
+    return (parsed.configs || []).map(normalizeSyncItem);
   }
 
   async function decryptConfigsWith(
@@ -905,11 +954,11 @@ export function useWorkspaceCloudSync({
       ? await decryptWithPasswordParts(payload, password, iv, salt)
       : await decryptWithPasswordEmbedded(payload, password);
     const parsed = JSON.parse(plaintext) as { configs?: RemoteConfigPreview[] };
-    return parsed.configs || [];
+    return (parsed.configs || []).map(normalizeSyncItem);
   }
 
   async function uploadPayload(items: RemoteConfigPreview[], version: number): Promise<string> {
-    const payload = JSON.stringify({ configs: items, syncedAt: Date.now() });
+    const payload = JSON.stringify({ configs: items.map(normalizeSyncItem), syncedAt: Date.now() });
     // 分立式加密：iv/salt 提升到 meta 字段（对照上游 vault 结构），payload 仅存密文
     const sealed = await encryptWithPassword(payload, syncPassword.value);
     await ensureAppVersion();
@@ -959,6 +1008,7 @@ export function useWorkspaceCloudSync({
       return;
     }
     loadingStart();
+    syncLastError.value = '';
     try {
       const gist = await findSyncGist();
       const localItems = configs.value.map(syncItemOf);
@@ -985,6 +1035,11 @@ export function useWorkspaceCloudSync({
 
       localStorage.setItem(GIST_ID_STORAGE_KEY, gist.id);
       const vault = parseVault(gist.content);
+      syncRemoteState.value = {
+        version: vault.version,
+        updatedAt: vault.updatedAt,
+        configCount: syncRemoteState.value?.configCount ?? -1,
+      };
       const signature = await sha256Hex(gist.content);
       // 锚点判等：签名一致说明远端未被其它设备修改
       const remoteChanged = !anchor || anchor.signature !== signature;
@@ -1141,7 +1196,7 @@ export function useWorkspaceCloudSync({
           picbed_type: item.picbed_type,
           config_name: item.config_name,
           is_default: item.is_default,
-          config: item.config,
+          config: sanitizeConfigMap(item.config as Record<string, unknown>),
         });
         const existing = configs.value.find(config => config.config_name === item.config_name);
         if (existing) {
@@ -1190,7 +1245,9 @@ export function useWorkspaceCloudSync({
       });
       showMessage(message);
     } catch (error) {
-      if (!quiet) showError(error instanceof Error ? error.message : t('msg.sync.syncFailed'));
+      const message = error instanceof Error ? error.message : t('msg.sync.syncFailed');
+      syncLastError.value = message;
+      if (!quiet) showError(message);
     } finally {
       loadingEnd();
     }
@@ -1222,10 +1279,7 @@ export function useWorkspaceCloudSync({
   /// 云端 config 中可能混入非字符串标记（如脱敏态 masked），写库前仅保留字符串值
   async function applyItemsToLocal(items: RemoteConfigPreview[]) {
     for (const item of items) {
-      const config: Record<string, string> = {};
-      for (const [key, value] of Object.entries(item.config || {})) {
-        if (typeof value === 'string') config[key] = value;
-      }
+      const config = sanitizeConfigMap(item.config as Record<string, unknown>);
       const body = JSON.stringify({
         picbed_type: item.picbed_type,
         config_name: item.config_name,
@@ -1293,7 +1347,16 @@ export function useWorkspaceCloudSync({
       }
       const gist = (await githubFetch(`/gists/${gistId}`)) as {
         history?: Array<{ version: string; committed_at: string }>;
+        files?: Record<string, GistFileEntry>;
       };
+      const currentVault = tryParseVault(gist.files?.[GIST_FILENAME]?.content, gist.files?.[GIST_FILENAME]?.truncated);
+      if (currentVault) {
+        syncRemoteState.value = {
+          version: currentVault.version,
+          updatedAt: currentVault.updatedAt,
+          configCount: syncRemoteState.value?.configCount ?? -1,
+        };
+      }
       const total = (gist.history || []).length;
       const currentVersion = syncRemoteState.value?.version || 0;
       syncHistory.value = (gist.history || []).map((item, index) => {
@@ -1556,9 +1619,11 @@ export function useWorkspaceCloudSync({
     syncBusy,
     syncConnected,
     syncTokenInvalid,
+    syncLastError,
     localConfigCount,
     syncStatusBadge,
     remoteVersionBadge,
+    remoteVersionBadgeStale,
     lastSyncText,
     canSyncNow,
     syncNow,
