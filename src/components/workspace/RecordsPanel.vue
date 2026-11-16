@@ -129,6 +129,24 @@ function clearCustomRange() {
   timeRangeFilter.value = '';
   showCustomRange.value = false;
 }
+function clearStatusFilter() {
+  statusFilter.value = '';
+  closeFilterDropdowns();
+}
+function clearSourceFilter() {
+  sourceFilter.value = '';
+  closeFilterDropdowns();
+}
+function clearTargetFilter() {
+  targetFilter.value = '';
+  closeFilterDropdowns();
+}
+function clearTimeFilter() {
+  timeRangeFilter.value = '';
+  appliedCustomRange.value = null;
+  showCustomRange.value = false;
+  closeFilterDropdowns();
+}
 onMounted(() => document.addEventListener('pointerdown', handleOutsidePointerDown));
 onBeforeUnmount(() => document.removeEventListener('pointerdown', handleOutsidePointerDown));
 
@@ -250,7 +268,7 @@ function hideUrlTooltip() {
 
 <template>
 <section class="panel stack">
-  <div class="section-title">
+  <div class="section-title records-section-title">
     <div>
       <p class="section-kicker">Timeline</p>
       <h2>{{ t('records.title') }}<span class="record-count-hint">{{ recordCountHint }}</span></h2>
@@ -263,16 +281,19 @@ function hideUrlTooltip() {
       <div class="record-filter status-filter custom-select" :class="{ open: openFilterDropdown === 'status' }">
         <button
           class="select-trigger"
+          :class="{ 'has-clear': statusFilter }"
           type="button"
           :aria-expanded="openFilterDropdown === 'status'"
           :aria-label="t('records.statusFilterAria')"
           @click="toggleFilterDropdown('status')"
         >
-          <span>{{ statusFilterLabel }}</span>
-          <ChevronDown :size="16" class="select-chevron" />
+          <span :class="{ placeholder: !statusFilter }">{{ statusFilterLabel }}</span>
+          <ChevronDown v-if="!statusFilter" :size="16" class="select-chevron" />
+        </button>
+        <button v-if="statusFilter" class="record-filter-clear" type="button" :aria-label="t('records.clearFilter')" @click="clearStatusFilter">
+          <X :size="14" />
         </button>
         <div v-if="openFilterDropdown === 'status'" class="select-menu">
-          <button class="select-option" :class="{ selected: !statusFilter }" type="button" @click="statusFilter = ''; closeFilterDropdowns()">{{ t('records.allStatus') }}</button>
           <button class="select-option" :class="{ selected: statusFilter === 'success' }" type="button" @click="statusFilter = 'success'; closeFilterDropdowns()">{{ t('records.statusSuccess') }}</button>
           <button class="select-option" :class="{ selected: statusFilter === 'failed' }" type="button" @click="statusFilter = 'failed'; closeFilterDropdowns()">{{ t('records.statusFailed') }}</button>
         </div>
@@ -280,16 +301,19 @@ function hideUrlTooltip() {
       <div class="record-filter custom-select" :class="{ open: openFilterDropdown === 'source' }">
         <button
           class="select-trigger"
+          :class="{ 'has-clear': sourceFilter }"
           type="button"
           :aria-expanded="openFilterDropdown === 'source'"
           :aria-label="t('records.sourceFilterAria')"
           @click="toggleFilterDropdown('source')"
         >
-          <span>{{ sourceFilterLabel }}</span>
-          <ChevronDown :size="16" class="select-chevron" />
+          <span :class="{ placeholder: !sourceFilter }">{{ sourceFilterLabel }}</span>
+          <ChevronDown v-if="!sourceFilter" :size="16" class="select-chevron" />
+        </button>
+        <button v-if="sourceFilter" class="record-filter-clear" type="button" :aria-label="t('records.clearFilter')" @click="clearSourceFilter">
+          <X :size="14" />
         </button>
         <div v-if="openFilterDropdown === 'source'" class="select-menu">
-          <button class="select-option" :class="{ selected: !sourceFilter }" type="button" @click="sourceFilter = ''; closeFilterDropdowns()">{{ t('records.allSources') }}</button>
           <button
             v-for="item in sourceOptions"
             :key="item"
@@ -303,16 +327,19 @@ function hideUrlTooltip() {
       <div class="record-filter custom-select" :class="{ open: openFilterDropdown === 'target' }">
         <button
           class="select-trigger"
+          :class="{ 'has-clear': targetFilter }"
           type="button"
           :aria-expanded="openFilterDropdown === 'target'"
           :aria-label="t('records.targetFilterAria')"
           @click="toggleFilterDropdown('target')"
         >
-          <span>{{ targetFilterLabel }}</span>
-          <ChevronDown :size="16" class="select-chevron" />
+          <span :class="{ placeholder: !targetFilter }">{{ targetFilterLabel }}</span>
+          <ChevronDown v-if="!targetFilter" :size="16" class="select-chevron" />
+        </button>
+        <button v-if="targetFilter" class="record-filter-clear" type="button" :aria-label="t('records.clearFilter')" @click="clearTargetFilter">
+          <X :size="14" />
         </button>
         <div v-if="openFilterDropdown === 'target'" class="select-menu">
-          <button class="select-option" :class="{ selected: !targetFilter }" type="button" @click="targetFilter = ''; closeFilterDropdowns()">{{ t('records.allTargets') }}</button>
           <button
             v-for="item in targetOptions"
             :key="item"
@@ -326,16 +353,19 @@ function hideUrlTooltip() {
       <div class="record-filter time-filter custom-select" :class="{ open: openFilterDropdown === 'time' }">
         <button
           class="select-trigger"
+          :class="{ 'has-clear': timeRangeFilter }"
           type="button"
           :aria-expanded="openFilterDropdown === 'time'"
           :aria-label="t('records.timeFilterAria')"
           @click="toggleFilterDropdown('time')"
         >
-          <span>{{ timeRangeLabel }}</span>
-          <ChevronDown :size="16" class="select-chevron" />
+          <span :class="{ placeholder: !timeRangeFilter }">{{ timeRangeLabel }}</span>
+          <ChevronDown v-if="!timeRangeFilter" :size="16" class="select-chevron" />
+        </button>
+        <button v-if="timeRangeFilter" class="record-filter-clear" type="button" :aria-label="t('records.clearFilter')" @click="clearTimeFilter">
+          <X :size="14" />
         </button>
         <div v-if="openFilterDropdown === 'time'" class="select-menu">
-          <button class="select-option" :class="{ selected: !timeRangeFilter }" type="button" @click="timeRangeFilter = ''; closeFilterDropdowns()">{{ t('records.allTime') }}</button>
           <button class="select-option" :class="{ selected: timeRangeFilter === 'today' }" type="button" @click="timeRangeFilter = 'today'; closeFilterDropdowns()">{{ t('records.today') }}</button>
           <button class="select-option" :class="{ selected: timeRangeFilter === '7d' }" type="button" @click="timeRangeFilter = '7d'; closeFilterDropdowns()">{{ t('records.last7Days') }}</button>
           <button class="select-option" :class="{ selected: timeRangeFilter === '30d' }" type="button" @click="timeRangeFilter = '30d'; closeFilterDropdowns()">{{ t('records.last30Days') }}</button>
@@ -404,7 +434,7 @@ function hideUrlTooltip() {
     </table>
   </div>
   <p v-if="records.length === 0" class="empty">{{ t('records.empty') }}</p>
-  <p v-else-if="filteredRecords.length === 0" class="empty">{{ t('records.noMatch', { keyword: recordSearch.trim() }) }}</p>
+  <p v-else-if="filteredRecords.length === 0" class="empty">{{ t('records.noMatch') }}</p>
 </section>
 
 <div v-if="recordDetailOpen && recordDetail" class="modal-backdrop" role="presentation" @click.self="closeRecordDetail">

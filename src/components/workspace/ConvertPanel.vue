@@ -135,7 +135,7 @@ function confirmClearQueue() {
         <h2>{{ t('convert.settingsTitle') }}</h2>
       </div>
     </div>
-    <div class="conversion-controls">
+    <div class="conversion-controls batch-conversion-controls">
       <label class="select-field">
         <span>{{ t('common.targetConfig') }}</span>
         <div class="custom-select" :class="{ open: targetDropdownOpen }">

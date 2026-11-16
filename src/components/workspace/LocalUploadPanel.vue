@@ -91,25 +91,27 @@ const {
     </div>
   </div>
   <div class="panel stack">
-    <div class="section-title">
+    <div class="section-title local-images-title">
       <div>
         <p class="section-kicker">Images</p>
         <h2>{{ t('local.imagesTitle') }}</h2>
       </div>
-      <label
-        class="upload-control"
-        :class="{ dragging: localImageDragActive }"
-        @dragenter.prevent="localImageDragActive = true"
-        @dragover.prevent="localImageDragActive = true"
-        @dragleave.prevent="localImageDragActive = false"
-        @drop.prevent="handleLocalImageDrop"
-        ><ImagePlus :size="18" /><span>{{ t('local.uploadImages') }}</span
-        ><input type="file" multiple accept="image/*" @change="handleLocalImageFiles"
-      /></label>
-      <label class="upload-control">
-        <ImagePlus :size="18" /><span>{{ t('common.chooseDir') }}</span
-        ><input type="file" multiple webkitdirectory @change="handleLocalImageFiles"
-      /></label>
+      <div class="upload-controls">
+        <label
+          class="upload-control"
+          :class="{ dragging: localImageDragActive }"
+          @dragenter.prevent="localImageDragActive = true"
+          @dragover.prevent="localImageDragActive = true"
+          @dragleave.prevent="localImageDragActive = false"
+          @drop.prevent="handleLocalImageDrop"
+          ><ImagePlus :size="18" /><span>{{ t('local.uploadImages') }}</span
+          ><input type="file" multiple accept="image/*" @change="handleLocalImageFiles"
+        /></label>
+        <label class="upload-control">
+          <ImagePlus :size="18" /><span>{{ t('common.chooseDir') }}</span
+          ><input type="file" multiple webkitdirectory @change="handleLocalImageFiles"
+        /></label>
+      </div>
     </div>
     <div class="local-summary">
       <span>{{ t('local.imagesCount', { count: localImages.length }) }}</span>

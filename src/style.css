@@ -1639,6 +1639,18 @@ svg {
   align-items: end;
   gap: 12px;
 }
+.conversion-controls.batch-conversion-controls {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+}
+.conversion-controls.batch-conversion-controls .select-field {
+  width: 100%;
+  max-width: none;
+}
+.conversion-controls.batch-conversion-controls .compact-actions {
+  width: 100%;
+  justify-content: space-between;
+}
 .conversion-controls > label:not(.select-field), .field-row > .select-field + label { display: none; }
 .select-field { position: relative; width: min(300px, 100%); min-width: 0; }
 .conversion-controls .select-field { width: 300px; max-width: 100%; }
@@ -1822,6 +1834,21 @@ svg {
   border: 1px solid #ffd0cc;
 }
 
+.local-images-title {
+  flex-wrap: wrap;
+  align-items: flex-start;
+  row-gap: 10px;
+}
+.local-images-title > div:first-child {
+  flex: 1 1 100%;
+}
+.upload-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
 .upload-control {
   width: fit-content;
   min-height: 44px;
@@ -2185,6 +2212,75 @@ table {
   gap: 6px;
   font-size: 13px;
   font-weight: 700;
+}
+.records-section-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+.records-section-title > div:first-child {
+  width: 100%;
+}
+.records-section-title .record-toolbar-actions {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+}
+.records-section-title .record-search {
+  flex: 1 1 auto;
+  min-width: 140px;
+}
+.records-section-title .record-search input {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+}
+.records-section-title .record-filter {
+  width: 150px;
+}
+.records-section-title .record-filter.status-filter {
+  width: 128px;
+}
+.records-section-title .record-filter.time-filter {
+  width: 240px;
+}
+.records-section-title .record-toolbar-actions > button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.record-filter .select-trigger.has-clear {
+  padding-right: 34px;
+}
+.record-filter .select-trigger > span.placeholder {
+  color: var(--faint);
+  font-weight: 700;
+}
+.record-filter-clear {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  z-index: 2;
+  width: 26px;
+  min-height: 26px;
+  padding: 0;
+  border-color: transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+.record-filter-clear:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--text);
+  transform: translateY(-50%);
+}
+html.dark .record-filter-clear:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.16);
+  color: var(--text);
 }
 .date-range-panel {
   position: absolute;
