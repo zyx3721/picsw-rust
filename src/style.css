@@ -2630,11 +2630,21 @@ th {
 .success-action:hover:not(:disabled) {
   background: #c9f3e2;
 }
+.dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.dialog-head h2 {
+  min-width: 0;
+}
 .dialog-icon {
   width: 48px;
   height: 48px;
   display: grid;
   place-items: center;
+  flex-shrink: 0;
   border-radius: 8px;
   color: var(--danger);
   background: var(--danger-soft);

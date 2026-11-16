@@ -16,9 +16,11 @@ const {
 <template>
   <div v-if="githubProxyDialogOpen" class="modal-backdrop" role="presentation" @click.self="closeGithubProxyDialog">
     <section class="confirm-dialog github-proxy-dialog" role="dialog" aria-modal="true" aria-labelledby="github-proxy-title">
-      <div class="dialog-icon github-proxy-icon"><FileSearch :size="22" /></div>
-      <div class="dialog-copy">
+      <div class="dialog-head">
+        <div class="dialog-icon github-proxy-icon"><FileSearch :size="22" /></div>
         <h2 id="github-proxy-title">{{ t('dlg.proxy.title') }}</h2>
+      </div>
+      <div class="dialog-copy">
         <p>{{ t('dlg.proxy.desc') }}</p>
       </div>
       <label class="checkbox proxy-toggle"><input v-model="githubProxyEnabled" type="checkbox" />{{ t('dlg.proxy.enable') }}</label>

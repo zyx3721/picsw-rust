@@ -201,9 +201,11 @@ function confirmClearQueue() {
   <Teleport to="body">
     <div v-if="clearConfirmOpen" class="modal-backdrop" role="presentation" @click.self="clearConfirmOpen = false">
       <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-queue-title">
-        <div class="dialog-icon"><Trash2 :size="22" /></div>
-        <div class="dialog-copy">
+        <div class="dialog-head">
+          <div class="dialog-icon"><Trash2 :size="22" /></div>
           <h2 id="clear-queue-title">{{ t('convert.clearAllTitle') }}</h2>
+        </div>
+        <div class="dialog-copy">
           <p>{{ t('convert.clearAllDesc', { count: batchFiles.length }) }}</p>
         </div>
         <div class="dialog-actions">

@@ -16,13 +16,15 @@ const isRunning = computed(() => taskProgress.status === 'running');
 <template>
   <div v-if="taskProgress.open" class="modal-backdrop task-progress-backdrop" role="presentation">
     <section class="confirm-dialog task-progress-dialog" role="dialog" aria-modal="true" aria-labelledby="task-progress-title">
-      <div class="dialog-icon task-progress-icon" :data-status="taskProgress.status">
-        <LoaderCircle v-if="isRunning" :size="24" class="spin-icon" />
-        <CheckCircle2 v-else-if="taskProgress.status === 'success'" :size="24" />
-        <XCircle v-else :size="24" />
+      <div class="dialog-head">
+        <div class="dialog-icon task-progress-icon" :data-status="taskProgress.status">
+          <LoaderCircle v-if="isRunning" :size="24" class="spin-icon" />
+          <CheckCircle2 v-else-if="taskProgress.status === 'success'" :size="24" />
+          <XCircle v-else :size="24" />
+        </div>
+        <h2 id="task-progress-title">{{ taskProgress.title }}</h2>
       </div>
       <div class="dialog-copy">
-        <h2 id="task-progress-title">{{ taskProgress.title }}</h2>
         <p>{{ taskProgress.message }}</p>
         <p v-if="taskProgress.detail">{{ taskProgress.detail }}</p>
       </div>

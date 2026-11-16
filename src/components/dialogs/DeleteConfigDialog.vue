@@ -16,9 +16,11 @@ watch(deleteTarget, open => {
 <template>
   <div v-if="deleteTarget" class="modal-backdrop" role="presentation" @click.self="cancelDeleteConfig">
     <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-config-title">
-      <div class="dialog-icon"><Trash2 :size="22" /></div>
-      <div class="dialog-copy">
+      <div class="dialog-head">
+        <div class="dialog-icon"><Trash2 :size="22" /></div>
         <h2 id="delete-config-title">{{ t('dlg.delete.title') }}</h2>
+      </div>
+      <div class="dialog-copy">
         <p>{{ t('dlg.delete.desc', { name: deleteTarget.config_name }) }}</p>
       </div>
       <div class="dialog-actions">
