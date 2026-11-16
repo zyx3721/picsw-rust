@@ -28,14 +28,14 @@ jobs:
             portableOS: windows
             portableArch: arm64
             jobName: Windows arm64 打包
-          - os: macos-14
+          - os: macos-13
             target: x86_64-apple-darwin
             bundles: dmg
             artifact: macos-amd64
             portableOS: macos
             portableArch: amd64
             jobName: macOS amd64 打包
-          - os: macos-14
+          - os: macos-15
             target: aarch64-apple-darwin
             bundles: dmg
             artifact: macos-arm64

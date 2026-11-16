@@ -259,7 +259,7 @@ picsw-rust/
 │   ├── components/           工作区面板与对话框组件
 │   ├── composables/          业务状态与逻辑（含深浅色主题 useTheme）
 │   │   └── workspace/        转换、本地上传、配置等业务模块（request.ts 为 IPC 分发层）
-│   ├── i18n/                 中英文文案词典与 t() 翻译函数
+│   ├── i18n/                 中英文文案词典、错误映射与 t() 翻译函数
 │   ├── App.vue               应用根组件
 │   ├── main.ts               前端入口
 │   └── style.css             全局样式
@@ -293,6 +293,7 @@ picsw-rust/
 | v1.2.2 | 2026-10-20 | [verchanglog/v1.2.2.md](verchanglog/v1.2.2.md) |
 | v1.2.3 | 2026-10-20 | [verchanglog/v1.2.3.md](verchanglog/v1.2.3.md) |
 | v1.2.4 | 2026-10-25 | [verchanglog/v1.2.4.md](verchanglog/v1.2.4.md) |
+| v1.2.5 | 2026-11-16 | [verchanglog/v1.2.5.md](verchanglog/v1.2.5.md) |
 
 各版本的构建产物与发布说明见 [GitHub Releases](https://github.com/zyx3721/picsw-rust/releases)。
 

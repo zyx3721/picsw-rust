@@ -261,7 +261,7 @@ picsw-rust/
 │   ├── components/           Workspace panels & dialogs
 │   ├── composables/          State orchestration (incl. useTheme for light/dark theme)
 │   │   └── workspace/        Convert / local upload / configs modules (request.ts is the IPC layer)
-│   ├── i18n/                 Chinese/English message dictionaries and the t() function
+│   ├── i18n/                 Chinese/English dictionaries, error mapping, and the t() function
 │   ├── App.vue               Root component
 │   ├── main.ts               Frontend entry
 │   └── style.css             Global styles
@@ -295,6 +295,7 @@ picsw-rust/
 | v1.2.2 | 2026-10-20 | [verchanglog/v1.2.2.md](verchanglog/v1.2.2.md) |
 | v1.2.3 | 2026-10-20 | [verchanglog/v1.2.3.md](verchanglog/v1.2.3.md) |
 | v1.2.4 | 2026-10-25 | [verchanglog/v1.2.4.md](verchanglog/v1.2.4.md) |
+| v1.2.5 | 2026-11-16 | [verchanglog/v1.2.5.md](verchanglog/v1.2.5.md) |
 
 Build artifacts and release notes for each version are available on the [GitHub Releases](https://github.com/zyx3721/picsw-rust/releases) page.
 
