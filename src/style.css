@@ -2436,7 +2436,6 @@ table {
 }
 .record-detail-table {
   width: 100%;
-  min-width: 1120px;
   margin: 0 auto;
   table-layout: fixed;
 }
