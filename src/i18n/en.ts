@@ -241,7 +241,7 @@ export const en: Record<keyof typeof zh, string> = {
   'about.progress': '{percent}% ({done} / {total})',
   'about.downloaded': 'Downloaded {size}',
   'about.closeBehaviorTitle': 'When Closing Window',
-  'about.closeBehaviorDesc': '"Ask" shows a dialog on first close; after minimizing, the app keeps running in the background — conversions continue, and the window can be restored or the app quit from the system tray',
+  'about.closeBehaviorDesc': 'Ask on close; minimize to tray keeps conversions running — restore or quit from the tray',
   'about.closeAsk': 'Ask every time',
   'about.closeTray': 'Minimize to tray',
   'about.closeQuit': 'Quit app',
