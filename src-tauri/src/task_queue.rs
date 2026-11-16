@@ -12,6 +12,11 @@ use crate::AppState;
 /// 单个任务内文档级转换并发数
 const CONVERT_DOCUMENT_CONCURRENCY: usize = 3;
 
+/// 仓库型图床的上传按仓库分支串行，实际并发为 1
+fn is_serial_repository(picbed_type: &str) -> bool {
+    matches!(picbed_type, "github" | "gitee")
+}
+
 pub fn start_workers(app: AppHandle, mut receiver: mpsc::Receiver<i64>) {
     tauri::async_runtime::spawn(async move {
         requeue_queued_tasks(&app).await;
@@ -91,14 +96,24 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
     };
 
     let total = files.len();
+    let target_picbed_type = files
+        .first()
+        .and_then(|file| {
+            with_db(app, |conn| {
+                engine::find_config_by_id(conn, file.target_config_id).map(|config| config.picbed_type)
+            })
+        })
+        .flatten()
+        .unwrap_or_default();
+    let start_message = if total > 1 && !is_serial_repository(&target_picbed_type) {
+        format!("共 {} 个文档，正在按并发度 {} 转换", total, CONVERT_DOCUMENT_CONCURRENCY)
+    } else {
+        format!("共 {} 个文档，正在转换", total)
+    };
     let _ = with_db(app, |conn| {
         conn.execute(
             "UPDATE conversion_tasks SET message = ?2, updated_at = ?3 WHERE id = ?1",
-            rusqlite::params![
-                task_id,
-                format!("共 {} 个文档，正在按并发度 {} 转换", total, CONVERT_DOCUMENT_CONCURRENCY),
-                now_string()
-            ],
+            rusqlite::params![task_id, start_message, now_string()],
         )
     });
 
@@ -201,14 +216,15 @@ async fn run_local_convert_task(app: &AppHandle, task_id: i64) {
 
     let upload_cache: engine::LocalUploadCache = Arc::new(std::sync::Mutex::new(std::collections::HashMap::new()));
     let total_documents = payload_manifest.documents.len();
+    let start_message = if total_documents > 1 && !is_serial_repository(&target.picbed_type) {
+        format!("共 {} 个文档，正在按并发度 {} 上传替换", total_documents, CONVERT_DOCUMENT_CONCURRENCY)
+    } else {
+        format!("共 {} 个文档，正在上传替换", total_documents)
+    };
     let _ = with_db(app, |conn| {
         conn.execute(
             "UPDATE conversion_tasks SET message = ?2, updated_at = ?3 WHERE id = ?1",
-            rusqlite::params![
-                task_id,
-                format!("共 {} 个文档，正在按并发度 {} 上传替换", total_documents, CONVERT_DOCUMENT_CONCURRENCY),
-                now_string()
-            ],
+            rusqlite::params![task_id, start_message, now_string()],
         )
     });
 
@@ -360,5 +376,18 @@ pub fn safe_local_task_name(value: &str) -> String {
         "file".to_string()
     } else {
         trimmed.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_serial_repository;
+
+    #[test]
+    fn serializes_repository_hosts_only() {
+        assert!(is_serial_repository("github"));
+        assert!(is_serial_repository("gitee"));
+        assert!(!is_serial_repository("easyimage"));
+        assert!(!is_serial_repository("other"));
     }
 }

@@ -50,7 +50,7 @@ Your documents, conversion history and image-host credentials stay on your own d
 - **Multi-host support** — GitHub, Gitee, Tencent Cloud COS, Aliyun OSS, Qiniu Kodo, Baidu BOS, Huawei OBS, Upyun, MinIO and EasyImage, plus self-hosted services with generic upload APIs.
 - **Document conversion** — Automatically detects image URLs and their hosts in uploaded Markdown; pick a target host and batch-convert in one click, then download the replaced document.
 - **Local upload** — Detects local image references (relative paths, absolute paths, `<img>` tags), uploads them to the target host and replaces them with remote URLs automatically.
-- **Task queue** — Batch conversion and local upload both run as persisted tasks consumed by a background worker, with document-level concurrency (3) inside each task; queued tasks resume automatically after an app restart, with progress visible at any time.
+- **Task queue** — Batch conversion and local upload both run as persisted tasks consumed by a background worker, with document-level concurrency (3) inside each task (GitHub/Gitee uploads to the same repository branch are serialized); queued tasks resume automatically after an app restart, with progress visible at any time.
 - **Filename formatting** — Object paths support `{y}`, `{m}`, `{d}`, `{hash}`, `{random}`, `{rand:N}`, `{timestamp}` and more, for date folders, content hashes or custom templates.
 - **Host configuration** — Add, edit, delete and test host configurations, with a default host; secrets are stored encrypted and masked in the UI.
 - **Conversion history** — Records source/target hosts, status and image counts for every conversion, with batch deletion, search and time-range filters, plus per-image replacement details.
@@ -97,7 +97,7 @@ The same host-swap scenario, side by side:
 
 - **Who does what** — The Vue workspace handles picking documents, choosing hosts and showing progress and results; document parsing, URL detection, image upload and replacement, and task scheduling all happen in the Rust core.
 - **Where data lives** — SQLite is the source of truth for host configurations, conversion tasks and history; host secrets are stored AES-256-GCM encrypted with the same key derivation as the web edition.
-- **Task queue** — Tasks are first persisted to SQLite, then fed into an in-memory queue consumed by a background worker, converting documents within a task concurrently (3 at a time); on startup, tasks still queued are re-enqueued automatically.
+- **Task queue** — Tasks are first persisted to SQLite, then fed into an in-memory queue consumed by a background worker, converting documents within a task concurrently (3 at a time; GitHub/Gitee writes to the same repository branch are serialized); on startup, tasks still queued are re-enqueued automatically.
 - **Network exposure** — Frontend and backend talk over Tauri IPC, so the app never listens on any TCP port; outbound HTTPS happens only when talking to image-host APIs.
 
 ## Tech Stack

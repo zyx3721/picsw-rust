@@ -171,6 +171,8 @@ const RULES: TranslationRule[] = [
   { pattern: /^转换任务已加入队列$/, replacement: 'Conversion task queued' },
   { pattern: /^本地上传任务已加入队列$/, replacement: 'Local upload task queued' },
   { pattern: /^转换任务执行中$/, replacement: 'Conversion task running' },
+  { pattern: /^共 (\d+) 个文档，正在转换$/, replacement: 'Documents: $1 · converting' },
+  { pattern: /^共 (\d+) 个文档，正在上传替换$/, replacement: 'Documents: $1 · uploading and replacing' },
   { pattern: /^共 (\d+) 个文档，正在按并发度 (\d+) 转换$/, replacement: 'Documents: $1 · converting with concurrency $2' },
   { pattern: /^共 (\d+) 个文档，正在按并发度 (\d+) 上传替换$/, replacement: 'Documents: $1 · uploading and replacing with concurrency $2' },
   { pattern: /^已完成 (\d+) \/ (\d+) 个文档$/, replacement: 'Documents done: $1 / $2' },
