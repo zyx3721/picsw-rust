@@ -363,10 +363,25 @@ pub async fn convert_local_one(
                 continue;
             }
         };
+        let content_key = content_cache_key(&image_file.data);
+        let content_cached = upload_cache
+            .lock()
+            .ok()
+            .and_then(|cache| cache.get(&content_key).cloned());
+        if let Some(cached) = content_cached {
+            if let Ok(mut cache) = upload_cache.lock() {
+                cache.insert(file_key.clone(), cached.clone());
+            }
+            resolved.insert(image_url.clone(), PendingImage::Use { url: cached.clone() });
+            details.push(success_detail(&image_url, &cached));
+            advance_document_progress(state, document_id);
+            continue;
+        }
         match uploader::upload(&target.picbed_type, target_config, &mut image_file.clone()).await {
             Ok(result) => {
                 if let Ok(mut cache) = upload_cache.lock() {
                     cache.insert(file_key.clone(), result.url.clone());
+                    cache.insert(content_key, result.url.clone());
                 }
                 resolved.insert(image_url.clone(), PendingImage::Use { url: result.url.clone() });
                 details.push(success_detail(&image_url, &result.url));
@@ -517,6 +532,13 @@ fn is_same_picbed(image_picbed: &str, target_picbed: &str) -> bool {
     !image_picbed.is_empty() && image_picbed != "other" && image_picbed == target_picbed
 }
 
+fn content_cache_key(data: &[u8]) -> String {
+    use sha2::{Digest, Sha256};
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    format!("content:{}", hex::encode(hasher.finalize()))
+}
+
 fn write_failed_record(
     state: &AppState,
     filename: &str,
@@ -661,7 +683,7 @@ pub fn load_record_details(conn: &rusqlite::Connection, record_id: i64) -> Vec<C
 
 #[cfg(test)]
 mod tests {
-    use super::is_same_picbed;
+    use super::{content_cache_key, is_same_picbed};
 
     #[test]
     fn skips_only_known_same_host() {
@@ -670,5 +692,11 @@ mod tests {
         assert!(!is_same_picbed("gitee", "github"));
         assert!(!is_same_picbed("other", "other"));
         assert!(!is_same_picbed("", "github"));
+    }
+
+    #[test]
+    fn content_cache_key_depends_on_bytes() {
+        assert_eq!(content_cache_key(b"same"), content_cache_key(b"same"));
+        assert_ne!(content_cache_key(b"same"), content_cache_key(b"other"));
     }
 }

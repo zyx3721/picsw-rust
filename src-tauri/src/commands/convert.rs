@@ -53,6 +53,8 @@ pub fn analyze_markdown(req: MarkdownRequest) -> Value {
 #[tauri::command]
 pub async fn create_convert_task(state: State<'_, AppState>, req: CreateConvertTaskRequest) -> Result<Value, String> {
     let mut files = req.files;
+    let mut seen = std::collections::HashSet::new();
+    files.retain(|file| seen.insert(document_name_key(&file.filename)));
     if files.is_empty() {
         return Err("请至少上传一个 Markdown 文件".to_string());
     }
@@ -103,9 +105,11 @@ pub async fn create_convert_task(state: State<'_, AppState>, req: CreateConvertT
 pub async fn create_local_convert_task(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
-    manifest: LocalBatchManifest,
-    images: Vec<LocalImageUpload>,
+    mut manifest: LocalBatchManifest,
+    mut images: Vec<LocalImageUpload>,
 ) -> Result<Value, String> {
+    let mut seen = std::collections::HashSet::new();
+    manifest.documents.retain(|document| seen.insert(document_name_key(&document.filename)));
     if manifest.target_config_id == 0 {
         return Err("请先选择目标图床配置".to_string());
     }
@@ -115,6 +119,13 @@ pub async fn create_local_convert_task(
     if manifest.documents.len() > 20 {
         return Err("单次最多处理 20 个 Markdown 文档".to_string());
     }
+    let used_keys: std::collections::HashSet<String> = manifest
+        .documents
+        .iter()
+        .flat_map(|document| document.images.iter().map(|image| image.file_key.trim().to_string()))
+        .filter(|key| !key.is_empty())
+        .collect();
+    images.retain(|image| used_keys.contains(image.key.trim()));
     let total_bytes: usize = images
         .iter()
         .map(|image| {
@@ -407,6 +418,15 @@ pub(crate) fn load_task_json(conn: &rusqlite::Connection, task_id: i64) -> Optio
     .ok()
 }
 
+fn document_name_key(name: &str) -> String {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        "untitled.md".to_string()
+    } else {
+        trimmed.to_lowercase()
+    }
+}
+
 fn document_image_total(content: &str) -> i64 {
     let images = crate::markdown::extract_markdown_images(content);
     let mut seen = std::collections::HashSet::new();
@@ -477,11 +497,18 @@ fn store_local_task_files(task_dir: &std::path::Path, images: &[LocalImageUpload
 
 #[cfg(test)]
 mod tests {
-    use super::document_image_total;
+    use super::{document_image_total, document_name_key};
 
     #[test]
     fn counts_unique_image_urls_only() {
         let content = "![a](https://a.com/1.png)\n![b](https://a.com/1.png)\n![c](images/local.png)\n![d](https://a.com/2.png)";
         assert_eq!(document_image_total(content), 3);
+    }
+
+    #[test]
+    fn normalizes_duplicate_document_names() {
+        assert_eq!(document_name_key("A.md"), document_name_key("a.md"));
+        assert_eq!(document_name_key("  "), document_name_key("untitled.md"));
+        assert_ne!(document_name_key("a.md"), document_name_key("b.md"));
     }
 }

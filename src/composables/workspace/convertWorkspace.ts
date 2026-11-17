@@ -195,9 +195,21 @@ export function useWorkspaceConvert({
     }
   }
   async function addMarkdownFiles(fileList: FileList | File[]) {
-    const files = Array.from(fileList).filter(file => file.name.toLowerCase().endsWith('.md'));
-    if (!files.length) {
+    const candidates = Array.from(fileList).filter(file => file.name.toLowerCase().endsWith('.md'));
+    if (!candidates.length) {
       showError(t('msg.needMdFiles'));
+      return;
+    }
+    const existing = new Set(batchFiles.value.map(file => file.filename.trim().toLowerCase()));
+    const files = candidates.filter(file => {
+      const key = file.name.trim().toLowerCase();
+      if (existing.has(key)) return false;
+      existing.add(key);
+      return true;
+    });
+    const skipped = candidates.length - files.length;
+    if (!files.length) {
+      showMessage(t('msg.convert.duplicateDocsSkipped', { count: skipped }));
       return;
     }
     const loaded = await Promise.all(
@@ -215,7 +227,8 @@ export function useWorkspaceConvert({
     );
     batchFiles.value = [...batchFiles.value, ...loaded];
     persistConvertWorkspace();
-    showMessage(t('msg.convert.addedFiles', { count: loaded.length }));
+    if (skipped > 0) showMessage(t('msg.convert.addedFilesSkipped', { added: loaded.length, skipped }));
+    else showMessage(t('msg.convert.addedFiles', { count: loaded.length }));
   }
   async function handleFiles(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -231,9 +244,14 @@ export function useWorkspaceConvert({
       showError(t('msg.convert.needPasteContent'));
       return;
     }
+    const filename = pasteForm.filename.trim() || 'pasted.md';
+    if (batchFiles.value.some(file => file.filename.trim().toLowerCase() === filename.toLowerCase())) {
+      showMessage(t('msg.convert.duplicateDocName'));
+      return;
+    }
     batchFiles.value.push({
       id: `paste-${createClientId()}`,
-      filename: pasteForm.filename || 'pasted.md',
+      filename,
       content: pasteForm.content,
       images: [],
       convertedContent: '',

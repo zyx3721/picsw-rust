@@ -184,9 +184,21 @@ export function useWorkspaceLocalUpload({
     clearPersistedLocalUploadWorkspace();
   }
   async function addLocalDocuments(fileList: FileList | File[]) {
-    const files = Array.from(fileList).filter(file => file.name.toLowerCase().endsWith('.md'));
-    if (!files.length) {
+    const candidates = Array.from(fileList).filter(file => file.name.toLowerCase().endsWith('.md'));
+    if (!candidates.length) {
       showError(t('msg.needMdFiles'));
+      return;
+    }
+    const existing = new Set(localDocuments.value.map(document => document.filename.trim().toLowerCase()));
+    const files = candidates.filter(file => {
+      const key = file.name.trim().toLowerCase();
+      if (existing.has(key)) return false;
+      existing.add(key);
+      return true;
+    });
+    const skipped = candidates.length - files.length;
+    if (!files.length) {
+      showMessage(t('msg.local.duplicateDocsSkipped', { count: skipped }));
       return;
     }
     const loaded = await Promise.all(
@@ -206,7 +218,8 @@ export function useWorkspaceLocalUpload({
     localDocuments.value = [...localDocuments.value, ...loaded];
     analyzeLocalMatches();
     persistLocalUploadWorkspace();
-    showMessage(t('msg.local.addedDocs', { count: loaded.length }));
+    if (skipped > 0) showMessage(t('msg.local.addedDocsSkipped', { added: loaded.length, skipped }));
+    else showMessage(t('msg.local.addedDocs', { count: loaded.length }));
   }
   async function handleLocalDocumentFiles(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -218,9 +231,25 @@ export function useWorkspaceLocalUpload({
     await addLocalDocuments(event.dataTransfer?.files || []);
   }
   function addLocalImages(fileList: FileList | File[]) {
-    const files = Array.from(fileList).filter(isImageFile);
-    if (!files.length) {
+    const candidates = Array.from(fileList).filter(isImageFile);
+    if (!candidates.length) {
       showError(t('msg.local.needImages'));
+      return;
+    }
+    const existing = new Set(
+      localImages.value
+        .filter(image => image.file)
+        .map(image => `${image.file!.name}-${image.file!.size}-${image.file!.lastModified}`)
+    );
+    const files = candidates.filter(file => {
+      const key = `${file.name}-${file.size}-${file.lastModified}`;
+      if (existing.has(key)) return false;
+      existing.add(key);
+      return true;
+    });
+    const skipped = candidates.length - files.length;
+    if (!files.length) {
+      showMessage(t('msg.local.duplicateImagesSkipped', { count: skipped }));
       return;
     }
     const loaded = files.map(file => ({
@@ -231,7 +260,8 @@ export function useWorkspaceLocalUpload({
     }));
     localImages.value = [...localImages.value, ...loaded];
     analyzeLocalMatches();
-    showMessage(t('msg.local.addedImages', { count: loaded.length }));
+    if (skipped > 0) showMessage(t('msg.local.addedImagesSkipped', { added: loaded.length, skipped }));
+    else showMessage(t('msg.local.addedImages', { count: loaded.length }));
   }
   function handleLocalImageFiles(event: Event) {
     const input = event.target as HTMLInputElement;
@@ -274,13 +304,15 @@ export function useWorkspaceLocalUpload({
         path: image.relativePath,
         sourcePath: image.path,
       }));
+    const skipped = images.length - added.length;
     if (!added.length) {
-      showMessage(t('msg.local.scanEmpty'));
+      showMessage(t('msg.local.duplicateImagesSkipped', { count: skipped }));
       return;
     }
     localImages.value = [...localImages.value, ...added];
     analyzeLocalMatches();
-    showMessage(t('msg.local.addedImages', { count: added.length }));
+    if (skipped > 0) showMessage(t('msg.local.addedImagesSkipped', { added: added.length, skipped }));
+    else showMessage(t('msg.local.addedImages', { count: added.length }));
   }
   function removeLocalDocument(id: string) {
     localDocuments.value = localDocuments.value.filter(item => item.id !== id);
