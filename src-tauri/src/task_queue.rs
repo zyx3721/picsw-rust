@@ -47,7 +47,17 @@ pub fn interrupt_running_tasks(app: &AppHandle) {
     })
     .unwrap_or_default();
     for task_id in tasks {
-        let _ = with_db(app, |conn| mark_task_interrupted(conn, task_id));
+        let cancelled = app.state::<AppState>().is_task_cancelled(Some(task_id));
+        let _ = with_db(app, |conn| {
+            if cancelled {
+                mark_task_cancelled(conn, task_id)
+            } else {
+                mark_task_interrupted(conn, task_id)
+            }
+        });
+        if cancelled {
+            app.state::<AppState>().clear_cancel(task_id);
+        }
     }
 }
 
