@@ -131,6 +131,15 @@ export type SyncRemoteState = {
 
 export type TaskProgressStatus = 'idle' | 'running' | 'success' | 'failed';
 
+export type TaskDocumentProgress = {
+  id: number;
+  filename: string;
+  total_images: number;
+  processed_images: number;
+  status: 'queued' | 'running' | 'success' | 'failed';
+  error: string;
+};
+
 export type TaskProgressState = {
   open: boolean;
   title: string;
@@ -142,6 +151,7 @@ export type TaskProgressState = {
   failed: number;
   status: TaskProgressStatus;
   closable: boolean;
+  documents: TaskDocumentProgress[];
 };
 
 export type RequestError = Error & { status?: number };

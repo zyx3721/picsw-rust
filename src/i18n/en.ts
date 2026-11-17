@@ -265,10 +265,17 @@ export const en: Record<keyof typeof zh, string> = {
   'dlg.delete.desc': 'Delete "{name}"? It can no longer be used for conversions.',
   'dlg.delete.confirm': 'Delete',
 
-  'dlg.task.progress': 'Progress {current} / {total}',
+  'dlg.task.progress': 'Documents {current} / {total}',
   'dlg.task.successCount': 'Success {count}',
   'dlg.task.failedCount': 'Failed {count}',
   'dlg.task.backgroundHint': 'The task runs in the background; minimizing to tray won\'t interrupt it, but quitting the app will',
+  'dlg.task.docsTitle': 'Document image progress',
+  'dlg.task.docsRunning': '{count} processing',
+  'dlg.task.docQueued': 'Queued',
+  'dlg.task.docRunning': 'Processing',
+  'dlg.task.docSuccess': 'Done',
+  'dlg.task.docFailed': 'Failed',
+  'dlg.task.docImages': '{done} / {total} images',
 
   'dlg.proxy.title': 'GitHub Image URLs Detected',
   'dlg.proxy.desc': 'The detected results include GitHub image file URLs; a proxy prefix can be added before conversion to help third-party services download them.',

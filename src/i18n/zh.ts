@@ -263,10 +263,17 @@ export const zh = {
   'dlg.delete.desc': '确认删除“{name}”吗？删除后无法用于后续转换',
   'dlg.delete.confirm': '删除',
 
-  'dlg.task.progress': '进度 {current} / {total}',
+  'dlg.task.progress': '文档 {current} / {total}',
   'dlg.task.successCount': '成功 {count}',
   'dlg.task.failedCount': '失败 {count}',
   'dlg.task.backgroundHint': '任务在后台执行；最小化到托盘不会中断进度，退出应用会中断当前进度',
+  'dlg.task.docsTitle': '文档图片进度',
+  'dlg.task.docsRunning': '{count} 个正在处理',
+  'dlg.task.docQueued': '等待中',
+  'dlg.task.docRunning': '处理中',
+  'dlg.task.docSuccess': '完成',
+  'dlg.task.docFailed': '失败',
+  'dlg.task.docImages': '{done} / {total} 张',
 
   'dlg.proxy.title': '检测到 GitHub 图床地址',
   'dlg.proxy.desc': '当前识别结果包含 GitHub 图片文件地址，可在转换前为这些地址添加代理前缀，便于第三方服务下载',

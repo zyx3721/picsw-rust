@@ -2,15 +2,42 @@
 import { CheckCircle2, LoaderCircle, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import type { TaskDocumentProgress } from '../../composables/workspace/types';
 import { t } from '../../i18n';
+import { localizeError } from '../../i18n/errorText';
 
 const { taskProgress, closeTaskProgress } = useWorkspaceContext();
 
 const progressPercent = computed(() => {
+  const totalImages = taskProgress.documents.reduce((sum, document) => sum + document.total_images, 0);
+  const processedImages = taskProgress.documents.reduce((sum, document) => sum + document.processed_images, 0);
+  if (totalImages > 0) return Math.min(100, Math.round((processedImages / totalImages) * 100));
   if (!taskProgress.total) return 0;
   return Math.min(100, Math.round((taskProgress.current / taskProgress.total) * 100));
 });
 const isRunning = computed(() => taskProgress.status === 'running');
+const runningDocumentCount = computed(
+  () => taskProgress.documents.filter(document => document.status === 'running').length
+);
+
+function documentPercent(document: TaskDocumentProgress) {
+  if (document.status === 'success') return 100;
+  if (!document.total_images) return 0;
+  return Math.min(100, Math.round((document.processed_images / document.total_images) * 100));
+}
+
+function documentStatusLabel(status: TaskDocumentProgress['status']) {
+  return {
+    queued: t('dlg.task.docQueued'),
+    running: t('dlg.task.docRunning'),
+    success: t('dlg.task.docSuccess'),
+    failed: t('dlg.task.docFailed'),
+  }[status];
+}
+
+function documentCountLabel(document: TaskDocumentProgress) {
+  return t('dlg.task.docImages', { done: document.processed_images, total: document.total_images });
+}
 </script>
 
 <template>
@@ -35,6 +62,34 @@ const isRunning = computed(() => taskProgress.status === 'running');
         <span>{{ t('dlg.task.progress', { current: taskProgress.current, total: taskProgress.total }) }}</span>
         <span>{{ t('dlg.task.successCount', { count: taskProgress.success }) }}</span>
         <span>{{ t('dlg.task.failedCount', { count: taskProgress.failed }) }}</span>
+      </div>
+      <div v-if="taskProgress.documents.length" class="task-progress-docs" aria-live="polite">
+        <div class="task-progress-docs-head">
+          <span>{{ t('dlg.task.docsTitle') }}</span>
+          <span v-if="runningDocumentCount > 0" class="task-progress-docs-running">
+            {{ t('dlg.task.docsRunning', { count: runningDocumentCount }) }}
+          </span>
+        </div>
+        <div class="task-progress-doc-list">
+          <div
+            v-for="document in taskProgress.documents"
+            :key="document.id"
+            class="task-progress-doc"
+            :data-status="document.status"
+          >
+            <div class="task-progress-doc-head">
+              <span class="task-progress-doc-name" :title="document.filename">{{ document.filename }}</span>
+              <span class="task-progress-doc-status">{{ documentStatusLabel(document.status) }}</span>
+              <span class="task-progress-doc-count">{{ documentCountLabel(document) }}</span>
+            </div>
+            <div class="task-progress-doc-meter" aria-hidden="true">
+              <span :style="{ width: documentPercent(document) + '%' }"></span>
+            </div>
+            <p v-if="document.status === 'failed' && document.error" class="task-progress-doc-error">
+              {{ localizeError(document.error) }}
+            </p>
+          </div>
+        </div>
       </div>
       <p v-if="isRunning" class="task-progress-warning">{{ t('dlg.task.backgroundHint') }}</p>
       <div v-else class="dialog-actions">

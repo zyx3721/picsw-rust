@@ -60,6 +60,16 @@ fn lock_db(state: &AppState) -> std::sync::MutexGuard<'_, rusqlite::Connection> 
     state.db.lock().expect("database lock poisoned")
 }
 
+/// 累加单个文档已处理的图片数，供任务进度弹窗实时展示
+fn advance_document_progress(state: &AppState, document_id: Option<i64>) {
+    let Some(document_id) = document_id else { return };
+    let conn = lock_db(state);
+    let _ = conn.execute(
+        "UPDATE conversion_task_documents SET processed_images = MIN(processed_images + 1, total_images), updated_at = ?2 WHERE id = ?1",
+        rusqlite::params![document_id, now_string()],
+    );
+}
+
 pub fn find_config_by_id(conn: &rusqlite::Connection, id: i64) -> Option<ConfigRow> {
     conn.query_row(
         "SELECT id, picbed_type, config_name, encrypted_config, created_at, updated_at FROM picbed_configs WHERE id = ?1",
@@ -122,6 +132,7 @@ pub async fn convert_one(
     req: &MarkdownRequest,
     upload_cache: &RemoteUploadCache,
     task_id: Option<i64>,
+    document_id: Option<i64>,
 ) -> Result<serde_json::Value, String> {
     if req.content.trim().is_empty() {
         return Err("Markdown 内容不能为空".to_string());
@@ -155,14 +166,17 @@ pub async fn convert_one(
     for image_url in unique_urls {
         if !is_http_image_url(&image_url) {
             resolved.insert(image_url.clone(), PendingImage::Keep(image_url));
+            advance_document_progress(state, document_id);
             continue;
         }
         match upload_cached(upload_cache, target.id, &image_url, &target.picbed_type, &target_config).await {
             Ok(url) => {
                 resolved.insert(image_url.clone(), PendingImage::Use { url });
+                advance_document_progress(state, document_id);
             }
             Err(err) => {
                 resolved.insert(image_url.clone(), PendingImage::Failed { message: err });
+                advance_document_progress(state, document_id);
                 break;
             }
         }
@@ -253,6 +267,7 @@ pub async fn convert_local_one(
     load_image: LocalImageLoader,
     upload_cache: &LocalUploadCache,
     task_id: Option<i64>,
+    document_id: Option<i64>,
 ) -> Result<serde_json::Value, String> {
     if document.content.trim().is_empty() {
         return Err("Markdown 内容不能为空".to_string());
@@ -278,6 +293,7 @@ pub async fn convert_local_one(
     for image_url in unique_urls {
         if is_http_image_url(&image_url) {
             resolved.insert(image_url.clone(), PendingImage::Keep(image_url));
+            advance_document_progress(state, document_id);
             continue;
         }
         let file_key = mapping_by_source
@@ -287,6 +303,7 @@ pub async fn convert_local_one(
         let Some(file_key) = file_key else {
             let message = format!("本地图片 {} 未匹配到上传文件", image_url);
             resolved.insert(image_url.clone(), PendingImage::Failed { message });
+            advance_document_progress(state, document_id);
             break;
         };
         let cached = upload_cache
@@ -295,12 +312,14 @@ pub async fn convert_local_one(
             .and_then(|cache| cache.get(&file_key).cloned());
         if let Some(cached) = cached {
             resolved.insert(image_url.clone(), PendingImage::Use { url: cached });
+            advance_document_progress(state, document_id);
             continue;
         }
         let image_file = match (load_image)(&file_key) {
             Ok(file) => file,
             Err(err) => {
                 resolved.insert(image_url.clone(), PendingImage::Failed { message: err });
+                advance_document_progress(state, document_id);
                 break;
             }
         };
@@ -310,10 +329,12 @@ pub async fn convert_local_one(
                     cache.insert(file_key.clone(), result.url.clone());
                 }
                 resolved.insert(image_url.clone(), PendingImage::Use { url: result.url });
+                advance_document_progress(state, document_id);
             }
             Err(err) => {
                 let message = format!("上传图片 {} 失败：{}", image_url, err);
                 resolved.insert(image_url.clone(), PendingImage::Failed { message });
+                advance_document_progress(state, document_id);
                 break;
             }
         }

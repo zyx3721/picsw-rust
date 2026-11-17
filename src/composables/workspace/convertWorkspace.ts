@@ -2,14 +2,14 @@ import { computed, reactive, ref, type Ref } from 'vue';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import { isGithubImageURL, normalizeProxyURL, withGithubProxy } from './imageProxy';
-import type { BatchFile, ConversionRecord, ConversionTask, MarkdownImage, PicbedConfig } from './types';
+import type { BatchFile, ConversionRecord, ConversionTask, MarkdownImage, PicbedConfig, TaskDocumentProgress } from './types';
 import { t } from '../../i18n';
 import { localizeBackendText } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const CONVERT_WORKSPACE_STORAGE_KEY = 'picbed_convert_workspace';
 
-type ConvertTaskData = { task: ConversionTask; records: ConversionRecord[] };
+type ConvertTaskData = { task: ConversionTask; records: ConversionRecord[]; documents?: TaskDocumentProgress[] };
 
 type PersistedConvertWorkspace = {
   targetConfigId: number;
@@ -40,7 +40,14 @@ type ConvertWorkspaceDeps = {
   typeLabel: (value: string) => string;
   loading: Ref<boolean>;
   startTaskProgress: (input: { title: string; message: string; total: number; detail?: string }) => void;
-  updateTaskProgress: (input: { message?: string; detail?: string; current?: number; success?: number; failed?: number }) => void;
+  updateTaskProgress: (input: {
+    message?: string;
+    detail?: string;
+    current?: number;
+    success?: number;
+    failed?: number;
+    documents?: TaskDocumentProgress[];
+  }) => void;
   finishTaskProgress: (input: { status: 'success' | 'failed'; message: string; detail?: string }) => void;
 };
 
@@ -140,12 +147,13 @@ export function useWorkspaceConvert({
     closeGithubProxyDialog();
     clearPersistedConvertWorkspace();
   }
-  function syncTaskProgress(task: ConversionTask) {
+  function syncTaskProgress(task: ConversionTask, documents?: TaskDocumentProgress[]) {
     updateTaskProgress({
       current: taskProgressValue(task),
       success: task.success,
       failed: task.failed,
       message: localizeBackendText(task.message) || t('msg.convert.taskRunning'),
+      documents,
     });
   }
   function applyTaskRecords(data: ConvertTaskData) {
@@ -306,7 +314,7 @@ export function useWorkspaceConvert({
     while (currentPollVersion === pollVersion) {
       const data = await request<ConvertTaskData>(`/api/convert/tasks/${taskId}`);
       if (currentPollVersion !== pollVersion) return;
-      syncTaskProgress(data.task);
+      syncTaskProgress(data.task, data.documents);
 
       if (taskFinished(data.task)) {
         activeTaskId = 0;

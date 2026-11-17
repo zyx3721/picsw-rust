@@ -61,6 +61,52 @@ fn with_db<T>(app: &AppHandle, f: impl FnOnce(&rusqlite::Connection) -> T) -> Op
     Some(f(&conn))
 }
 
+fn document_ids_for_task(app: &AppHandle, task_id: i64) -> Vec<i64> {
+    with_db(app, |conn| {
+        let mut stmt = match conn.prepare("SELECT id FROM conversion_task_documents WHERE task_id = ?1 ORDER BY id ASC") {
+            Ok(stmt) => stmt,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map([task_id], |row| row.get::<_, i64>(0))
+            .map(|rows| rows.filter_map(|row| row.ok()).collect())
+            .unwrap_or_default()
+    })
+    .unwrap_or_default()
+}
+
+fn reset_task_documents(app: &AppHandle, task_id: i64) {
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE conversion_task_documents SET status = 'queued', processed_images = 0, error = '', updated_at = ?2 WHERE task_id = ?1",
+            rusqlite::params![task_id, now_string()],
+        )
+    });
+}
+
+fn mark_document_running(app: &AppHandle, document_id: Option<i64>) {
+    let Some(document_id) = document_id else { return };
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE conversion_task_documents SET status = 'running', updated_at = ?2 WHERE id = ?1",
+            rusqlite::params![document_id, now_string()],
+        )
+    });
+}
+
+fn finish_task_document(app: &AppHandle, document_id: Option<i64>, error: Option<&str>) {
+    let Some(document_id) = document_id else { return };
+    let (status, message) = match error {
+        Some(err) => ("failed", err),
+        None => ("success", ""),
+    };
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE conversion_task_documents SET status = ?2, processed_images = total_images, error = ?3, updated_at = ?4 WHERE id = ?1",
+            rusqlite::params![document_id, status, message, now_string()],
+        )
+    });
+}
+
 async fn run_convert_task(app: &AppHandle, task_id: i64) {
     let Some(task) = with_db(app, |conn| load_task(conn, task_id)) else { return };
     let Some(task) = task else { return };
@@ -78,6 +124,7 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
     if !claimed.unwrap_or(false) {
         return;
     }
+    reset_task_documents(app, task_id);
 
     if task.task_type == engine::LOCAL_CONVERT_TASK_TYPE {
         run_local_convert_task(app, task_id).await;
@@ -119,19 +166,20 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
 
     let upload_cache: engine::RemoteUploadCache = Arc::new(std::sync::Mutex::new(HashMap::new()));
     let semaphore = Arc::new(tokio::sync::Semaphore::new(CONVERT_DOCUMENT_CONCURRENCY));
+    let document_ids = document_ids_for_task(app, task_id);
     let mut set = tokio::task::JoinSet::new();
-    for file in files {
+    for (index, file) in files.into_iter().enumerate() {
         let permit = semaphore.clone().acquire_owned().await.expect("semaphore open");
         let app = app.clone();
         let upload_cache = upload_cache.clone();
+        let document_id = document_ids.get(index).copied();
         set.spawn(async move {
             let state = app.state::<AppState>();
-            let result = engine::convert_one(&state, &file, &upload_cache, Some(task_id)).await;
+            mark_document_running(&app, document_id);
+            let result = engine::convert_one(&state, &file, &upload_cache, Some(task_id), document_id).await;
             drop(permit);
-            match result {
-                Ok(_) => Ok(()),
-                Err(err) => Err(format!("{}：{}", document_filename(&file.filename), err)),
-            }
+            let filename = document_filename(&file.filename);
+            (document_id, result.map_err(|err| (filename, err)))
         });
     }
 
@@ -140,10 +188,16 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
     let mut done = 0usize;
     let mut first_error = String::new();
     while let Some(joined) = set.join_next().await {
-        match joined.unwrap_or_else(|error| Err(error.to_string())) {
-            Ok(()) => success += 1,
-            Err(err) => {
+        let (document_id, result) = joined.unwrap_or_else(|error| (None, Err((String::new(), error.to_string()))));
+        match result {
+            Ok(_) => {
+                success += 1;
+                finish_task_document(app, document_id, None);
+            }
+            Err((filename, err)) => {
                 failed += 1;
+                finish_task_document(app, document_id, Some(&err));
+                let err = if filename.is_empty() { err } else { format!("{}：{}", filename, err) };
                 if first_error.is_empty() {
                     first_error = err;
                 }
@@ -231,23 +285,33 @@ async fn run_local_convert_task(app: &AppHandle, task_id: i64) {
     let target = Arc::new(target);
     let target_config = Arc::new(target_config);
     let semaphore = Arc::new(tokio::sync::Semaphore::new(CONVERT_DOCUMENT_CONCURRENCY));
+    let document_ids = document_ids_for_task(app, task_id);
     let mut set = tokio::task::JoinSet::new();
-    for document in payload_manifest.documents {
+    for (index, document) in payload_manifest.documents.into_iter().enumerate() {
         let permit = semaphore.clone().acquire_owned().await.expect("semaphore open");
         let app = app.clone();
         let target = target.clone();
         let target_config = target_config.clone();
         let load_image = load_image.clone();
         let upload_cache = upload_cache.clone();
+        let document_id = document_ids.get(index).copied();
         set.spawn(async move {
             let state = app.state::<AppState>();
-            let result =
-                engine::convert_local_one(&state, &document, &target, &target_config, load_image, &upload_cache, Some(task_id)).await;
+            mark_document_running(&app, document_id);
+            let result = engine::convert_local_one(
+                &state,
+                &document,
+                &target,
+                &target_config,
+                load_image,
+                &upload_cache,
+                Some(task_id),
+                document_id,
+            )
+            .await;
             drop(permit);
-            match result {
-                Ok(_) => Ok(()),
-                Err(err) => Err(format!("{}：{}", document_filename(&document.filename), err)),
-            }
+            let filename = document_filename(&document.filename);
+            (document_id, result.map_err(|err| (filename, err)))
         });
     }
 
@@ -256,10 +320,16 @@ async fn run_local_convert_task(app: &AppHandle, task_id: i64) {
     let mut done = 0usize;
     let mut first_error = String::new();
     while let Some(joined) = set.join_next().await {
-        match joined.unwrap_or_else(|error| Err(error.to_string())) {
-            Ok(()) => success += 1,
-            Err(err) => {
+        let (document_id, result) = joined.unwrap_or_else(|error| (None, Err((String::new(), error.to_string()))));
+        match result {
+            Ok(_) => {
+                success += 1;
+                finish_task_document(app, document_id, None);
+            }
+            Err((filename, err)) => {
                 failed += 1;
+                finish_task_document(app, document_id, Some(&err));
+                let err = if filename.is_empty() { err } else { format!("{}：{}", filename, err) };
                 if first_error.is_empty() {
                     first_error = err;
                 }

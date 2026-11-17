@@ -8,7 +8,7 @@ type StartTaskInput = {
   detail?: string;
 };
 
-type UpdateTaskInput = Partial<Pick<TaskProgressState, 'message' | 'detail' | 'current' | 'success' | 'failed'>> & {
+type UpdateTaskInput = Partial<Pick<TaskProgressState, 'message' | 'detail' | 'current' | 'success' | 'failed' | 'documents'>> & {
   status?: TaskProgressStatus;
 };
 
@@ -24,6 +24,7 @@ export function useTaskProgress() {
     failed: 0,
     status: 'idle',
     closable: true,
+    documents: [],
   });
 
   function startTaskProgress(input: StartTaskInput) {
@@ -37,6 +38,7 @@ export function useTaskProgress() {
     taskProgress.failed = 0;
     taskProgress.status = 'running';
     taskProgress.closable = false;
+    taskProgress.documents = [];
   }
 
   function updateTaskProgress(input: UpdateTaskInput) {
@@ -45,6 +47,7 @@ export function useTaskProgress() {
     if (input.current !== undefined) taskProgress.current = input.current;
     if (input.success !== undefined) taskProgress.success = input.success;
     if (input.failed !== undefined) taskProgress.failed = input.failed;
+    if (input.documents !== undefined) taskProgress.documents = input.documents;
     if (input.status !== undefined) taskProgress.status = input.status;
   }
 
@@ -60,6 +63,7 @@ export function useTaskProgress() {
     if (!taskProgress.closable) return;
     taskProgress.open = false;
     taskProgress.status = 'idle';
+    taskProgress.documents = [];
   }
 
   return { taskProgress, startTaskProgress, updateTaskProgress, finishTaskProgress, closeTaskProgress };

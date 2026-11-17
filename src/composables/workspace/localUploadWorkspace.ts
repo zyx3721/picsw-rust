@@ -1,14 +1,14 @@
 import { computed, ref, type Ref } from 'vue';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
-import type { ConversionRecord, ConversionTask, LocalDocument, LocalImageFile, MarkdownImage, PicbedConfig } from './types';
+import type { ConversionRecord, ConversionTask, LocalDocument, LocalImageFile, MarkdownImage, PicbedConfig, TaskDocumentProgress } from './types';
 import { t } from '../../i18n';
 import { localizeBackendText } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const LOCAL_UPLOAD_WORKSPACE_STORAGE_KEY = 'picbed_local_upload_workspace';
 
-type LocalTaskData = { task: ConversionTask; records: ConversionRecord[] };
+type LocalTaskData = { task: ConversionTask; records: ConversionRecord[]; documents?: TaskDocumentProgress[] };
 
 type PersistedLocalUploadWorkspace = {
   targetConfigId: number;
@@ -27,7 +27,14 @@ type LocalUploadWorkspaceDeps = {
   typeLabel: (value: string) => string;
   loading: Ref<boolean>;
   startTaskProgress: (input: { title: string; message: string; total: number; detail?: string }) => void;
-  updateTaskProgress: (input: { message?: string; detail?: string; current?: number; success?: number; failed?: number }) => void;
+  updateTaskProgress: (input: {
+    message?: string;
+    detail?: string;
+    current?: number;
+    success?: number;
+    failed?: number;
+    documents?: TaskDocumentProgress[];
+  }) => void;
   finishTaskProgress: (input: { status: 'success' | 'failed'; message: string; detail?: string }) => void;
 };
 
@@ -208,12 +215,13 @@ export function useWorkspaceLocalUpload({
     persistLocalUploadWorkspace();
     showMessage(t('msg.local.matchedCount', { count: localMatchedCount.value }));
   }
-  function syncLocalTaskProgress(task: ConversionTask) {
+  function syncLocalTaskProgress(task: ConversionTask, documents?: TaskDocumentProgress[]) {
     updateTaskProgress({
       current: taskProgressValue(task),
       success: task.success,
       failed: task.failed,
       message: localizeBackendText(task.message) || t('msg.local.taskRunning'),
+      documents,
     });
   }
   function applyLocalTaskRecords(data: LocalTaskData) {
@@ -252,7 +260,7 @@ export function useWorkspaceLocalUpload({
     while (currentPollVersion === localPollVersion) {
       const data = await request<LocalTaskData>(`/api/convert/tasks/${taskId}`);
       if (currentPollVersion !== localPollVersion) return;
-      syncLocalTaskProgress(data.task);
+      syncLocalTaskProgress(data.task, data.documents);
 
       if (taskFinished(data.task)) {
         activeLocalTaskId = 0;

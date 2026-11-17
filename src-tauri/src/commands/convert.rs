@@ -73,7 +73,13 @@ pub async fn create_convert_task(state: State<'_, AppState>, req: CreateConvertT
             rusqlite::params![files.len() as i64, payload, now_string(), now_string()],
         )
         .map_err(|_| "创建转换任务失败".to_string())?;
-        conn.last_insert_rowid()
+        let task_id = conn.last_insert_rowid();
+        let documents: Vec<(String, i64)> = files
+            .iter()
+            .map(|file| (file.filename.clone(), document_image_total(&file.content)))
+            .collect();
+        insert_task_documents(&conn, task_id, &documents).map_err(|_| "创建转换任务失败".to_string())?;
+        task_id
     };
     if let Err(err) = task_queue::enqueue(&state, task_id).await {
         let _ = lock_db(&state).map(|conn| {
@@ -123,7 +129,14 @@ pub async fn create_local_convert_task(
             rusqlite::params![manifest.documents.len() as i64, now_string(), now_string()],
         )
         .map_err(|_| "创建本地上传任务失败".to_string())?;
-        conn.last_insert_rowid()
+        let task_id = conn.last_insert_rowid();
+        let documents: Vec<(String, i64)> = manifest
+            .documents
+            .iter()
+            .map(|document| (document.filename.clone(), document_image_total(&document.content)))
+            .collect();
+        insert_task_documents(&conn, task_id, &documents).map_err(|_| "创建本地上传任务失败".to_string())?;
+        task_id
     };
 
     let task_dir = task_queue::local_task_dir(&app, task_id);
@@ -199,7 +212,8 @@ pub fn get_convert_task(state: State<AppState>, id: i64) -> Result<Value, String
         .iter()
         .filter_map(|record_id| load_record_with_details(&conn, *record_id))
         .collect();
-    Ok(json!({ "task": task, "records": records }))
+    let documents = load_task_documents(&conn, id);
+    Ok(json!({ "task": task, "records": records, "documents": documents }))
 }
 
 #[tauri::command]
@@ -286,6 +300,49 @@ fn load_task_json(conn: &rusqlite::Connection, task_id: i64) -> Option<Value> {
     .ok()
 }
 
+fn document_image_total(content: &str) -> i64 {
+    let images = crate::markdown::extract_markdown_images(content);
+    let mut seen = std::collections::HashSet::new();
+    images
+        .iter()
+        .filter(|image| seen.insert(image.url.trim().to_string()))
+        .count() as i64
+}
+
+fn insert_task_documents(conn: &rusqlite::Connection, task_id: i64, documents: &[(String, i64)]) -> rusqlite::Result<()> {
+    let now = now_string();
+    for (filename, total_images) in documents {
+        conn.execute(
+            "INSERT INTO conversion_task_documents (task_id, filename, total_images, processed_images, status, error, created_at, updated_at) VALUES (?1, ?2, ?3, 0, 'queued', '', ?4, ?5)",
+            rusqlite::params![task_id, filename, total_images, now, now],
+        )?;
+    }
+    Ok(())
+}
+
+fn load_task_documents(conn: &rusqlite::Connection, task_id: i64) -> Vec<Value> {
+    let mut stmt = match conn.prepare(
+        "SELECT id, filename, total_images, processed_images, status, error FROM conversion_task_documents WHERE task_id = ?1 ORDER BY id ASC",
+    ) {
+        Ok(stmt) => stmt,
+        Err(_) => return Vec::new(),
+    };
+    let rows = stmt.query_map([task_id], |row| {
+        Ok(json!({
+            "id": row.get::<_, i64>(0)?,
+            "filename": row.get::<_, String>(1)?,
+            "total_images": row.get::<_, i64>(2)?,
+            "processed_images": row.get::<_, i64>(3)?,
+            "status": row.get::<_, String>(4)?,
+            "error": row.get::<_, String>(5)?,
+        }))
+    });
+    match rows {
+        Ok(rows) => rows.filter_map(|row| row.ok()).collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
 fn store_local_task_files(task_dir: &std::path::Path, images: &[LocalImageUpload]) -> Result<(), String> {
     std::fs::create_dir_all(task_dir).map_err(|e| e.to_string())?;
     use base64::engine::general_purpose::STANDARD as BASE64;
@@ -303,4 +360,15 @@ fn store_local_task_files(task_dir: &std::path::Path, images: &[LocalImageUpload
         std::fs::write(&path, data).map_err(|e| e.to_string())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::document_image_total;
+
+    #[test]
+    fn counts_unique_image_urls_only() {
+        let content = "![a](https://a.com/1.png)\n![b](https://a.com/1.png)\n![c](images/local.png)\n![d](https://a.com/2.png)";
+        assert_eq!(document_image_total(content), 3);
+    }
 }

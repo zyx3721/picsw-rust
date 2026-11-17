@@ -2789,7 +2789,9 @@ th {
   z-index: 70;
 }
 .task-progress-dialog {
-  width: min(460px, 100%);
+  width: min(500px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 .task-progress-icon {
   color: var(--primary-strong);
@@ -2838,6 +2840,109 @@ th {
   background: var(--surface-muted);
   color: var(--muted);
   font-weight: 800;
+}
+.task-progress-docs {
+  display: grid;
+  gap: 8px;
+}
+.task-progress-docs-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.task-progress-docs-running {
+  color: var(--primary-strong);
+}
+.task-progress-doc-list {
+  display: grid;
+  gap: 9px;
+  max-height: 184px;
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+}
+.task-progress-doc {
+  display: grid;
+  gap: 5px;
+}
+.task-progress-doc-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.task-progress-doc-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+.task-progress-doc-status {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+.task-progress-doc-count {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.task-progress-doc-meter {
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-muted);
+}
+.task-progress-doc-meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--primary), #0f9f92);
+  transition: width 220ms ease;
+}
+.task-progress-doc[data-status='queued'] .task-progress-doc-name {
+  color: var(--muted);
+  font-weight: 600;
+}
+.task-progress-doc[data-status='queued'] .task-progress-doc-meter span {
+  background: var(--border-strong);
+}
+.task-progress-doc[data-status='running'] .task-progress-doc-status {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+}
+.task-progress-doc[data-status='success'] .task-progress-doc-status {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.task-progress-doc[data-status='success'] .task-progress-doc-meter span {
+  background: var(--success);
+}
+.task-progress-doc[data-status='failed'] .task-progress-doc-status {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.task-progress-doc[data-status='failed'] .task-progress-doc-meter span {
+  background: var(--danger);
+}
+.task-progress-doc-error {
+  margin: 0;
+  color: var(--danger);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
 }
 .task-progress-warning {
   margin: 0;

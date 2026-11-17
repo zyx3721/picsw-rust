@@ -30,6 +30,19 @@ CREATE TABLE IF NOT EXISTS conversion_tasks (
 );
 CREATE INDEX IF NOT EXISTS idx_conversion_tasks_status ON conversion_tasks(status);
 
+CREATE TABLE IF NOT EXISTS conversion_task_documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL REFERENCES conversion_tasks(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    total_images INTEGER NOT NULL DEFAULT 0,
+    processed_images INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'queued',
+    error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_conversion_task_documents_task_id ON conversion_task_documents(task_id);
+
 CREATE TABLE IF NOT EXISTS conversion_records (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     original_filename TEXT NOT NULL,
