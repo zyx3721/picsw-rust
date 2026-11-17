@@ -2119,9 +2119,13 @@ svg {
 .empty {
   color: var(--muted);
 }
-.local-image-row span {
+.local-image-row .local-image-path {
   direction: rtl;
   text-align: left;
+}
+.batch-row .local-image-name,
+.batch-row .local-image-name strong {
+  color: var(--text);
 }
 .batch-row small {
   color: var(--danger);

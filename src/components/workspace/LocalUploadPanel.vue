@@ -234,8 +234,12 @@ function confirmScan() {
     <div v-if="localImageFilter !== 'missing'" class="batch-list local-image-list">
       <div v-for="image in localFilteredImages" :key="image.key" class="batch-row local-image-row" data-status="analyzed">
         <div>
-          <strong>{{ image.name }}</strong>
-          <span>{{ image.path }}</span>
+          <AppTooltip class="local-image-name" :label="image.name" wrap>
+            <strong>{{ image.name }}</strong>
+          </AppTooltip>
+          <AppTooltip class="local-image-path" :label="image.path" wrap>
+            <span>{{ image.path }}</span>
+          </AppTooltip>
         </div>
         <div class="row-actions">
           <button class="danger icon-only" type="button" @click="removeLocalImage(image.key)">
@@ -250,7 +254,9 @@ function confirmScan() {
     <div v-else class="batch-list local-image-list">
       <div v-for="path in localMissingReferences" :key="path" class="batch-row local-image-row" data-status="failed">
         <div>
-          <strong :title="path">{{ path }}</strong>
+          <AppTooltip class="local-image-name" :label="path" wrap>
+            <strong>{{ path }}</strong>
+          </AppTooltip>
           <span>{{ t('local.missingBadge') }}</span>
         </div>
       </div>

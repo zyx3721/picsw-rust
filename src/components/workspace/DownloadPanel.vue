@@ -132,8 +132,10 @@ function confirmClearDocuments() {
         :data-status="image.status"
       >
         <div>
-          <strong>{{ image.name }}</strong>
-          <AppTooltip :label="image.url" wrap>
+          <AppTooltip class="local-image-name" :label="image.name" wrap>
+            <strong>{{ image.name }}</strong>
+          </AppTooltip>
+          <AppTooltip class="local-image-path" :label="image.url" wrap>
             <span>{{ image.url }}</span>
           </AppTooltip>
           <AppTooltip v-if="image.error" :label="localizeError(image.error)" wrap>
