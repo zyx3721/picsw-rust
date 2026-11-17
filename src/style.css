@@ -1753,7 +1753,12 @@ svg {
 }
 .select-option small { color: var(--muted); font-size: 12px; font-weight: 750; }
 .select-option.selected small { color: var(--primary-strong); }
-.placeholder-option { color: var(--muted); }
+.select-empty {
+  padding: 10px 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: center;
+}
 .compact-actions {
   justify-content: flex-end;
   flex-wrap: nowrap;

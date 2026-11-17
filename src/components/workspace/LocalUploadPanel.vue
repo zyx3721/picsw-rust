@@ -314,14 +314,7 @@ function confirmScan() {
             <ChevronDown :size="18" class="select-chevron" />
           </button>
           <div v-if="localTargetDropdownOpen" class="select-menu">
-            <button
-              class="select-option placeholder-option"
-              type="button"
-              :class="{ selected: !localTargetConfigId }"
-              @click="selectLocalTargetConfig(0)"
-            >
-              {{ t('common.pleaseSelect') }}
-            </button>
+            <div v-if="!localTargetConfigs.length" class="select-empty">{{ t('config.empty') }}</div>
             <button
               v-for="item in localTargetConfigs"
               :key="item.id"

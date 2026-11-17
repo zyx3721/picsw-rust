@@ -220,6 +220,10 @@ export function usePicbedWorkspace() {
     setTargetConfigId: id => {
       convertForm.target_config_id = id;
     },
+    getLocalTargetConfigId: () => localTargetConfigId.value,
+    setLocalTargetConfigId: id => {
+      localTargetConfigId.value = id;
+    },
     getDefaultTarget: () => defaultTarget.value,
     mergeTypeDefs,
   });

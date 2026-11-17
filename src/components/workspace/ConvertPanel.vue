@@ -182,14 +182,7 @@ function confirmClearQueue() {
             <ChevronDown :size="18" class="select-chevron" />
           </button>
           <div v-if="targetDropdownOpen" class="select-menu">
-            <button
-              class="select-option placeholder-option"
-              type="button"
-              :class="{ selected: !convertForm.target_config_id }"
-              @click="selectTargetConfig(0)"
-            >
-              {{ t('common.pleaseSelect') }}
-            </button>
+            <div v-if="!targetConfigs.length" class="select-empty">{{ t('config.empty') }}</div>
             <button
               v-for="item in targetConfigs"
               :key="item.id"
@@ -206,7 +199,6 @@ function confirmClearQueue() {
       </label>
       <label
         >{{ t('common.targetConfig') }}<select v-model.number="convertForm.target_config_id">
-          <option :value="0">{{ t('common.pleaseSelect') }}</option>
           <option v-for="item in targetConfigs" :key="item.id" :value="item.id">
             {{ item.config_name }} · {{ typeLabel(item.picbed_type) }}
           </option>
