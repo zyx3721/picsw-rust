@@ -1,9 +1,11 @@
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc;
 
+use crate::commands::download::{unique_target, write_atomically};
 use crate::engine::{self, LocalBatchManifest, MarkdownRequest};
 use crate::models::now_string;
 use crate::uploader;
@@ -68,10 +70,11 @@ fn mark_task_interrupted(conn: &rusqlite::Connection, task_id: i64) -> rusqlite:
         rusqlite::params![task_id, INTERRUPTED_TASK_ERROR, now],
     )?;
     let success = count_documents(conn, task_id, "success");
+    let partial = count_documents(conn, task_id, "partial");
     let failed = count_documents(conn, task_id, "failed");
     conn.execute(
-        "UPDATE conversion_tasks SET status = 'interrupted', success = ?2, failed = ?3, message = ?4, error = ?5, ended_at = ?6, updated_at = ?6 WHERE id = ?1 AND status = 'running'",
-        rusqlite::params![task_id, success, failed, INTERRUPTED_TASK_MESSAGE, INTERRUPTED_TASK_ERROR, now],
+        "UPDATE conversion_tasks SET status = 'interrupted', success = ?2, partial = ?3, failed = ?4, message = ?5, error = ?6, ended_at = ?7, updated_at = ?7 WHERE id = ?1 AND status = 'running'",
+        rusqlite::params![task_id, success, partial, failed, INTERRUPTED_TASK_MESSAGE, INTERRUPTED_TASK_ERROR, now],
     )?;
     Ok(())
 }
@@ -165,6 +168,7 @@ fn document_ids_for_task(app: &AppHandle, task_id: i64) -> Vec<i64> {
 struct TaskDocumentState {
     completed: HashSet<i64>,
     success: i64,
+    partial: i64,
     failed: i64,
 }
 
@@ -173,17 +177,21 @@ fn prepare_task_documents(app: &AppHandle, task_id: i64) -> TaskDocumentState {
         let rows = {
             let mut stmt = match conn.prepare("SELECT id, status FROM conversion_task_documents WHERE task_id = ?1 ORDER BY id ASC") {
                 Ok(stmt) => stmt,
-                Err(_) => return TaskDocumentState { completed: HashSet::new(), success: 0, failed: 0 },
+                Err(_) => return TaskDocumentState { completed: HashSet::new(), success: 0, partial: 0, failed: 0 },
             };
             stmt.query_map([task_id], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))
                 .map(|rows| rows.filter_map(|row| row.ok()).collect::<Vec<_>>())
                 .unwrap_or_default()
         };
-        let mut state = TaskDocumentState { completed: HashSet::new(), success: 0, failed: 0 };
+        let mut state = TaskDocumentState { completed: HashSet::new(), success: 0, partial: 0, failed: 0 };
         for (document_id, status) in rows {
             match status.as_str() {
                 "success" => {
                     state.success += 1;
+                    state.completed.insert(document_id);
+                }
+                "partial" => {
+                    state.partial += 1;
                     state.completed.insert(document_id);
                 }
                 "failed" => {
@@ -199,21 +207,36 @@ fn prepare_task_documents(app: &AppHandle, task_id: i64) -> TaskDocumentState {
         );
         state
     })
-    .unwrap_or(TaskDocumentState { completed: HashSet::new(), success: 0, failed: 0 })
+    .unwrap_or(TaskDocumentState { completed: HashSet::new(), success: 0, partial: 0, failed: 0 })
 }
 
 /// 把中断任务恢复为排队状态，仅重试未完成文档
 pub fn prepare_task_resume(conn: &rusqlite::Connection, task_id: i64) -> rusqlite::Result<()> {
     let now = now_string();
-    conn.execute(
-        "UPDATE conversion_task_documents SET status = 'queued', processed_images = 0, error = '', updated_at = ?2 WHERE task_id = ?1 AND status IN ('queued', 'running', 'interrupted')",
-        rusqlite::params![task_id, now],
-    )?;
+    let task_type = conn
+        .query_row("SELECT task_type FROM conversion_tasks WHERE id = ?1", [task_id], |row| row.get::<_, String>(0))
+        .unwrap_or_default();
+    if task_type == "download" {
+        conn.execute(
+            "UPDATE conversion_task_documents SET status = 'queued', processed_images = 0, error = '', updated_at = ?2 WHERE task_id = ?1 AND status != 'success'",
+            rusqlite::params![task_id, now],
+        )?;
+        conn.execute(
+            "UPDATE download_task_images SET status = 'pending', error = '', updated_at = ?2 WHERE task_id = ?1 AND status != 'success'",
+            rusqlite::params![task_id, now],
+        )?;
+    } else {
+        conn.execute(
+            "UPDATE conversion_task_documents SET status = 'queued', processed_images = 0, error = '', updated_at = ?2 WHERE task_id = ?1 AND status IN ('queued', 'running', 'interrupted')",
+            rusqlite::params![task_id, now],
+        )?;
+    }
     let success = count_documents(conn, task_id, "success");
+    let partial = count_documents(conn, task_id, "partial");
     let failed = count_documents(conn, task_id, "failed");
     conn.execute(
-        "UPDATE conversion_tasks SET status = 'queued', success = ?2, failed = ?3, message = '任务已恢复，等待继续执行', error = '', ended_at = NULL, updated_at = ?4 WHERE id = ?1",
-        rusqlite::params![task_id, success, failed, now],
+        "UPDATE conversion_tasks SET status = 'queued', success = ?2, partial = ?3, failed = ?4, message = '任务已恢复，等待继续执行', error = '', ended_at = NULL, updated_at = ?5 WHERE id = ?1",
+        rusqlite::params![task_id, success, partial, failed, now],
     )?;
     Ok(())
 }
@@ -240,6 +263,15 @@ pub fn check_task_resumable(conn: &rusqlite::Connection, task_id: i64) -> Result
         if files.is_empty() || !files.iter().all(|file| std::path::Path::new(&file.path).is_file()) {
             return Err("本地上传的临时文件已清理，无法继续".to_string());
         }
+    } else if task_type == "download" {
+        let parsed: engine::DownloadTaskPayload =
+            serde_json::from_str(&payload).map_err(|_| "下载任务载荷解析失败".to_string())?;
+        if parsed.documents.is_empty() {
+            return Err("下载任务载荷不正确".to_string());
+        }
+        if !std::path::Path::new(parsed.target_dir.trim()).is_dir() {
+            return Err("下载目录不存在，无法继续".to_string());
+        }
     } else if task_type == "convert" {
         let files: Vec<MarkdownRequest> =
             serde_json::from_str(&payload).map_err(|_| "转换任务载荷解析失败".to_string())?;
@@ -264,12 +296,17 @@ fn mark_task_cancelled(conn: &rusqlite::Connection, task_id: i64) -> rusqlite::R
         "UPDATE conversion_task_documents SET status = 'cancelled', error = '', updated_at = ?2 WHERE task_id = ?1 AND status IN ('queued', 'running', 'interrupted')",
         rusqlite::params![task_id, now],
     )?;
-    let success = count_documents(conn, task_id, "success");
-    let failed = count_documents(conn, task_id, "failed");
-    let message = format!("任务已取消，成功 {} 个，失败 {} 个", success, failed);
     conn.execute(
-        "UPDATE conversion_tasks SET status = 'cancelled', success = ?2, failed = ?3, message = ?4, error = '', ended_at = ?5, updated_at = ?5 WHERE id = ?1",
-        rusqlite::params![task_id, success, failed, message, now],
+        "UPDATE download_task_images SET status = 'cancelled', updated_at = ?2 WHERE task_id = ?1 AND status IN ('pending', 'running')",
+        rusqlite::params![task_id, now],
+    )?;
+    let success = count_documents(conn, task_id, "success");
+    let partial = count_documents(conn, task_id, "partial");
+    let failed = count_documents(conn, task_id, "failed");
+    let message = format!("任务已取消，成功 {} 个，部分 {} 个，失败 {} 个", success, partial, failed);
+    conn.execute(
+        "UPDATE conversion_tasks SET status = 'cancelled', success = ?2, partial = ?3, failed = ?4, message = ?5, error = '', ended_at = ?6, updated_at = ?6 WHERE id = ?1",
+        rusqlite::params![task_id, success, partial, failed, message, now],
     )?;
     Ok(())
 }
@@ -305,17 +342,21 @@ fn mark_document_running(app: &AppHandle, document_id: Option<i64>) {
     });
 }
 
-fn finish_task_document(app: &AppHandle, document_id: Option<i64>, error: Option<&str>) {
+fn finish_task_document(app: &AppHandle, document_id: Option<i64>, status: &str, error: Option<&str>) {
     let Some(document_id) = document_id else { return };
-    let (status, message) = match error {
-        Some(err) => ("failed", err),
-        None => ("success", ""),
-    };
+    let message = error.unwrap_or("");
     let _ = with_db(app, |conn| {
-        conn.execute(
-            "UPDATE conversion_task_documents SET status = ?2, processed_images = total_images, error = ?3, updated_at = ?4 WHERE id = ?1",
-            rusqlite::params![document_id, status, message, now_string()],
-        )
+        if status == "success" {
+            conn.execute(
+                "UPDATE conversion_task_documents SET status = ?2, processed_images = total_images, error = ?3, updated_at = ?4 WHERE id = ?1",
+                rusqlite::params![document_id, status, message, now_string()],
+            )
+        } else {
+            conn.execute(
+                "UPDATE conversion_task_documents SET status = ?2, error = ?3, updated_at = ?4 WHERE id = ?1",
+                rusqlite::params![document_id, status, message, now_string()],
+            )
+        }
     });
 }
 
@@ -325,10 +366,15 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
     if task.status != "queued" {
         return;
     }
+    let claim_message = match task.task_type.as_str() {
+        "download" => "下载任务执行中",
+        engine::LOCAL_CONVERT_TASK_TYPE => "本地上传任务执行中",
+        _ => "转换任务执行中",
+    };
     let claimed = with_db(app, |conn| {
         conn.execute(
-            "UPDATE conversion_tasks SET status = 'running', message = '转换任务执行中', started_at = ?2, updated_at = ?3 WHERE id = ?1 AND status = 'queued'",
-            rusqlite::params![task_id, now_string(), now_string()],
+            "UPDATE conversion_tasks SET status = 'running', message = ?2, started_at = ?3, updated_at = ?4 WHERE id = ?1 AND status = 'queued'",
+            rusqlite::params![task_id, claim_message, now_string(), now_string()],
         )
         .map(|rows| rows > 0)
         .unwrap_or(false)
@@ -339,11 +385,16 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
     let prepared = prepare_task_documents(app, task_id);
     let completed_documents = prepared.completed;
     let mut success = prepared.success;
+    let mut partial = prepared.partial;
     let mut failed = prepared.failed;
-    let mut done = (success + failed) as usize;
+    let mut done = (success + partial + failed) as usize;
 
+    if task.task_type == "download" {
+        run_download_task(app, task_id, completed_documents, success, partial, failed).await;
+        return;
+    }
     if task.task_type == engine::LOCAL_CONVERT_TASK_TYPE {
-        run_local_convert_task(app, task_id, completed_documents, success, failed).await;
+        run_local_convert_task(app, task_id, completed_documents, success, partial, failed).await;
         return;
     }
     if task.task_type != "convert" {
@@ -414,16 +465,21 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
     while let Some(joined) = set.join_next().await {
         let (document_id, result) = joined.unwrap_or_else(|error| (None, Err((String::new(), error.to_string()))));
         match result {
-            Ok(_) => {
-                success += 1;
-                finish_task_document(app, document_id, None);
+            Ok(value) => {
+                if value.get("status").and_then(|status| status.as_str()) == Some("partial") {
+                    partial += 1;
+                    finish_task_document(app, document_id, "partial", None);
+                } else {
+                    success += 1;
+                    finish_task_document(app, document_id, "success", None);
+                }
             }
             Err((_, err)) if err == engine::TASK_CANCELLED => {
                 cancelled_docs += 1;
             }
             Err((filename, err)) => {
                 failed += 1;
-                finish_task_document(app, document_id, Some(&err));
+                finish_task_document(app, document_id, "failed", Some(&err));
                 let err = if filename.is_empty() { err } else { format!("{}：{}", filename, err) };
                 if first_error.is_empty() {
                     first_error = err;
@@ -434,8 +490,8 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
         let message = format!("已完成 {} / {} 个文档", done, total);
         let _ = with_db(app, |conn| {
             conn.execute(
-                "UPDATE conversion_tasks SET success = ?2, failed = ?3, message = ?4, updated_at = ?5 WHERE id = ?1",
-                rusqlite::params![task_id, success, failed, message, now_string()],
+                "UPDATE conversion_tasks SET success = ?2, partial = ?3, failed = ?4, message = ?5, updated_at = ?6 WHERE id = ?1",
+                rusqlite::params![task_id, success, partial, failed, message, now_string()],
             )
         });
     }
@@ -447,11 +503,11 @@ async fn run_convert_task(app: &AppHandle, task_id: i64) {
     }
 
     let status = if failed > 0 { "failed" } else { "success" };
-    let message = format!("转换完成，成功 {} 个，失败 {} 个", success, failed);
+    let message = format!("转换完成，成功 {} 个，部分 {} 个，失败 {} 个", success, partial, failed);
     let _ = with_db(app, |conn| {
         conn.execute(
-            "UPDATE conversion_tasks SET status = ?2, success = ?3, failed = ?4, message = ?5, error = ?6, ended_at = ?7, updated_at = ?8 WHERE id = ?1",
-            rusqlite::params![task_id, status, success, failed, message, first_error, now_string(), now_string()],
+            "UPDATE conversion_tasks SET status = ?2, success = ?3, partial = ?4, failed = ?5, message = ?6, error = ?7, ended_at = ?8, updated_at = ?9 WHERE id = ?1",
+            rusqlite::params![task_id, status, success, partial, failed, message, first_error, now_string(), now_string()],
         )
     });
     app.state::<AppState>().clear_cancel(task_id);
@@ -462,6 +518,7 @@ async fn run_local_convert_task(
     task_id: i64,
     completed_documents: HashSet<i64>,
     mut success: i64,
+    mut partial: i64,
     mut failed: i64,
 ) {
     let cleanup_dir = local_task_dir(app, task_id);
@@ -565,22 +622,27 @@ async fn run_local_convert_task(
         });
     }
 
-    let mut done = (success + failed) as usize;
+    let mut done = (success + partial + failed) as usize;
     let mut cancelled_docs = 0usize;
     let mut first_error = String::new();
     while let Some(joined) = set.join_next().await {
         let (document_id, result) = joined.unwrap_or_else(|error| (None, Err((String::new(), error.to_string()))));
         match result {
-            Ok(_) => {
-                success += 1;
-                finish_task_document(app, document_id, None);
+            Ok(value) => {
+                if value.get("status").and_then(|status| status.as_str()) == Some("partial") {
+                    partial += 1;
+                    finish_task_document(app, document_id, "partial", None);
+                } else {
+                    success += 1;
+                    finish_task_document(app, document_id, "success", None);
+                }
             }
             Err((_, err)) if err == engine::TASK_CANCELLED => {
                 cancelled_docs += 1;
             }
             Err((filename, err)) => {
                 failed += 1;
-                finish_task_document(app, document_id, Some(&err));
+                finish_task_document(app, document_id, "failed", Some(&err));
                 let err = if filename.is_empty() { err } else { format!("{}：{}", filename, err) };
                 if first_error.is_empty() {
                     first_error = err;
@@ -591,8 +653,8 @@ async fn run_local_convert_task(
         let message = format!("已完成 {} / {} 个文档", done, total_documents);
         let _ = with_db(app, |conn| {
             conn.execute(
-                "UPDATE conversion_tasks SET success = ?2, failed = ?3, message = ?4, updated_at = ?5 WHERE id = ?1",
-                rusqlite::params![task_id, success, failed, message, now_string()],
+                "UPDATE conversion_tasks SET success = ?2, partial = ?3, failed = ?4, message = ?5, updated_at = ?6 WHERE id = ?1",
+                rusqlite::params![task_id, success, partial, failed, message, now_string()],
             )
         });
     }
@@ -604,14 +666,179 @@ async fn run_local_convert_task(
     }
 
     let status = if failed > 0 { "failed" } else { "success" };
-    let message = format!("本地图片上传完成，成功 {} 个，失败 {} 个", success, failed);
+    let message = format!("本地图片上传完成，成功 {} 个，部分 {} 个，失败 {} 个", success, partial, failed);
     let _ = with_db(app, |conn| {
         conn.execute(
-            "UPDATE conversion_tasks SET status = ?2, success = ?3, failed = ?4, message = ?5, error = ?6, ended_at = ?7, updated_at = ?8 WHERE id = ?1",
-            rusqlite::params![task_id, status, success, failed, message, first_error, now_string(), now_string()],
+            "UPDATE conversion_tasks SET status = ?2, success = ?3, partial = ?4, failed = ?5, message = ?6, error = ?7, ended_at = ?8, updated_at = ?9 WHERE id = ?1",
+            rusqlite::params![task_id, status, success, partial, failed, message, first_error, now_string(), now_string()],
         )
     });
     app.state::<AppState>().clear_cancel(task_id);
+}
+
+#[derive(Debug)]
+struct DownloadImageRow {
+    id: i64,
+    url: String,
+    status: String,
+}
+
+async fn run_download_task(
+    app: &AppHandle,
+    task_id: i64,
+    completed_documents: HashSet<i64>,
+    mut success: i64,
+    mut partial: i64,
+    mut failed: i64,
+) {
+    let payload = with_db(app, |conn| {
+        let task = load_task(conn, task_id)?;
+        serde_json::from_str::<engine::DownloadTaskPayload>(&task.payload).ok()
+    })
+    .flatten();
+    let Some(payload) = payload else {
+        fail_task(app, task_id, "下载任务载荷解析失败", "payload missing");
+        return;
+    };
+    let target = PathBuf::from(payload.target_dir.trim());
+    if !target.is_dir() {
+        fail_task(app, task_id, "下载目录不存在，请重新选择", "");
+        return;
+    }
+    let document_ids = document_ids_for_task(app, task_id);
+    let total_documents = payload.documents.len();
+    let mut done = (success + partial + failed) as usize;
+    for (index, _document) in payload.documents.iter().enumerate() {
+        let document_id = document_ids.get(index).copied();
+        if document_id.is_some_and(|id| completed_documents.contains(&id)) {
+            continue;
+        }
+        if app.state::<AppState>().is_task_cancelled(Some(task_id)) {
+            let _ = with_db(app, |conn| mark_task_cancelled(conn, task_id));
+            app.state::<AppState>().clear_cancel(task_id);
+            return;
+        }
+        mark_document_running(app, document_id);
+        let rows = load_download_image_rows(app, task_id, index);
+        let mut ok = 0i64;
+        let mut image_failed = 0i64;
+        for row in rows {
+            if app.state::<AppState>().is_task_cancelled(Some(task_id)) {
+                let _ = with_db(app, |conn| mark_task_cancelled(conn, task_id));
+                app.state::<AppState>().clear_cancel(task_id);
+                return;
+            }
+            if row.status == "success" {
+                ok += 1;
+                advance_document_progress(app, document_id);
+                continue;
+            }
+            match uploader::download_image(&row.url).await {
+                Ok(image) => {
+                    let path = unique_target(&target, &image.filename);
+                    match write_atomically(&path, &image.data) {
+                        Ok(()) => {
+                            ok += 1;
+                            update_download_image_success(app, row.id, &image.filename, &path.to_string_lossy());
+                            advance_document_progress(app, document_id);
+                        }
+                        Err(error) => {
+                            image_failed += 1;
+                            update_download_image_failed(app, row.id, &format!("写入文件失败：{error}"));
+                        }
+                    }
+                }
+                Err(error) => {
+                    image_failed += 1;
+                    update_download_image_failed(app, row.id, &error);
+                }
+            }
+        }
+        let status = if image_failed == 0 { "success" } else if ok == 0 { "failed" } else { "partial" };
+        let message = if image_failed > 0 { format!("{} 张图片下载失败", image_failed) } else { String::new() };
+        finish_download_document(app, document_id, status, ok, &message);
+        match status {
+            "partial" => partial += 1,
+            "failed" => failed += 1,
+            _ => success += 1,
+        }
+        done += 1;
+        let progress_message = format!("已完成 {} / {} 个文档", done, total_documents);
+        let _ = with_db(app, |conn| {
+            conn.execute(
+                "UPDATE conversion_tasks SET success = ?2, partial = ?3, failed = ?4, message = ?5, updated_at = ?6 WHERE id = ?1",
+                rusqlite::params![task_id, success, partial, failed, progress_message, now_string()],
+            )
+        });
+    }
+    let status = if failed > 0 { "failed" } else { "success" };
+    let message = format!("下载完成，成功 {} 个，部分 {} 个，失败 {} 个", success, partial, failed);
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE conversion_tasks SET status = ?2, success = ?3, partial = ?4, failed = ?5, message = ?6, error = '', ended_at = ?7, updated_at = ?8 WHERE id = ?1",
+            rusqlite::params![task_id, status, success, partial, failed, message, now_string(), now_string()],
+        )
+    });
+    app.state::<AppState>().clear_cancel(task_id);
+}
+
+fn load_download_image_rows(app: &AppHandle, task_id: i64, document_index: usize) -> Vec<DownloadImageRow> {
+    with_db(app, |conn| {
+        let mut stmt = match conn.prepare(
+            "SELECT id, url, status FROM download_task_images WHERE task_id = ?1 AND document_index = ?2 ORDER BY id ASC",
+        ) {
+            Ok(stmt) => stmt,
+            Err(_) => return Vec::new(),
+        };
+        stmt.query_map(rusqlite::params![task_id, document_index as i64], |row| {
+            Ok(DownloadImageRow {
+                id: row.get(0)?,
+                url: row.get(1)?,
+                status: row.get(2)?,
+            })
+        })
+        .map(|rows| rows.filter_map(|row| row.ok()).collect())
+        .unwrap_or_default()
+    })
+    .unwrap_or_default()
+}
+
+fn advance_document_progress(app: &AppHandle, document_id: Option<i64>) {
+    let Some(document_id) = document_id else { return };
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE conversion_task_documents SET processed_images = MIN(processed_images + 1, total_images), updated_at = ?2 WHERE id = ?1",
+            rusqlite::params![document_id, now_string()],
+        )
+    });
+}
+
+fn update_download_image_success(app: &AppHandle, image_id: i64, file_name: &str, saved_path: &str) {
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE download_task_images SET status = 'success', file_name = ?2, saved_path = ?3, error = '', updated_at = ?4 WHERE id = ?1",
+            rusqlite::params![image_id, file_name, saved_path, now_string()],
+        )
+    });
+}
+
+fn update_download_image_failed(app: &AppHandle, image_id: i64, error: &str) {
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE download_task_images SET status = 'failed', error = ?2, updated_at = ?3 WHERE id = ?1",
+            rusqlite::params![image_id, error, now_string()],
+        )
+    });
+}
+
+fn finish_download_document(app: &AppHandle, document_id: Option<i64>, status: &str, processed: i64, error: &str) {
+    let Some(document_id) = document_id else { return };
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE conversion_task_documents SET status = ?2, processed_images = ?3, error = ?4, updated_at = ?5 WHERE id = ?1",
+            rusqlite::params![document_id, status, processed, error, now_string()],
+        )
+    });
 }
 
 fn document_filename(filename: &str) -> String {
@@ -721,6 +948,7 @@ mod tests {
                 status TEXT NOT NULL,
                 total INTEGER NOT NULL,
                 success INTEGER NOT NULL,
+                partial INTEGER NOT NULL DEFAULT 0,
                 failed INTEGER NOT NULL,
                 message TEXT NOT NULL,
                 error TEXT NOT NULL,
@@ -733,6 +961,12 @@ mod tests {
                 status TEXT NOT NULL,
                 processed_images INTEGER NOT NULL DEFAULT 0,
                 error TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE download_task_images (
+                id INTEGER PRIMARY KEY,
+                task_id INTEGER NOT NULL,
+                status TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );",
         )
@@ -767,22 +1001,24 @@ mod tests {
     #[test]
     fn interrupts_running_task_and_unfinished_documents() {
         let conn = test_connection();
-        insert_task(&conn, 1, "running", 3, 1, 0);
+        insert_task(&conn, 1, "running", 4, 1, 0);
         insert_document(&conn, 1, "success", 15);
+        insert_document(&conn, 1, "partial", 7);
         insert_document(&conn, 1, "running", 3);
         insert_document(&conn, 1, "queued", 0);
 
         mark_task_interrupted(&conn, 1).unwrap();
 
-        let (status, success, failed, message, error, ended_at): (String, i64, i64, String, String, Option<String>) = conn
+        let (status, success, partial, failed, message, error, ended_at): (String, i64, i64, i64, String, String, Option<String>) = conn
             .query_row(
-                "SELECT status, success, failed, message, error, ended_at FROM conversion_tasks WHERE id = 1",
+                "SELECT status, success, partial, failed, message, error, ended_at FROM conversion_tasks WHERE id = 1",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?)),
             )
             .unwrap();
         assert_eq!(status, "interrupted");
         assert_eq!(success, 1);
+        assert_eq!(partial, 1);
         assert_eq!(failed, 0);
         assert_eq!(message, "任务已中断：应用退出");
         assert_eq!(error, "应用退出导致任务中断");
@@ -796,8 +1032,9 @@ mod tests {
             .filter_map(|row| row.ok())
             .collect();
         assert_eq!(statuses[0], ("success".to_string(), String::new(), 15));
-        assert_eq!(statuses[1], ("interrupted".to_string(), "应用退出导致任务中断".to_string(), 3));
-        assert_eq!(statuses[2], ("interrupted".to_string(), "应用退出导致任务中断".to_string(), 0));
+        assert_eq!(statuses[1], ("partial".to_string(), String::new(), 7));
+        assert_eq!(statuses[2], ("interrupted".to_string(), "应用退出导致任务中断".to_string(), 3));
+        assert_eq!(statuses[3], ("interrupted".to_string(), "应用退出导致任务中断".to_string(), 0));
     }
 
     #[test]
@@ -822,22 +1059,24 @@ mod tests {
     #[test]
     fn resumes_only_unfinished_documents() {
         let conn = test_connection();
-        insert_task(&conn, 1, "interrupted", 3, 1, 0);
+        insert_task(&conn, 1, "interrupted", 4, 1, 0);
         insert_document(&conn, 1, "success", 15);
+        insert_document(&conn, 1, "partial", 7);
         insert_document(&conn, 1, "interrupted", 5);
         insert_document(&conn, 1, "queued", 0);
 
         prepare_task_resume(&conn, 1).unwrap();
 
-        let (status, success, failed, ended_at): (String, i64, i64, Option<String>) = conn
+        let (status, success, partial, failed, ended_at): (String, i64, i64, i64, Option<String>) = conn
             .query_row(
-                "SELECT status, success, failed, ended_at FROM conversion_tasks WHERE id = 1",
+                "SELECT status, success, partial, failed, ended_at FROM conversion_tasks WHERE id = 1",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
             )
             .unwrap();
         assert_eq!(status, "queued");
         assert_eq!(success, 1);
+        assert_eq!(partial, 1);
         assert_eq!(failed, 0);
         assert!(ended_at.is_none());
 
@@ -849,29 +1088,32 @@ mod tests {
             .filter_map(|row| row.ok())
             .collect();
         assert_eq!(documents[0], ("success".to_string(), 15));
-        assert_eq!(documents[1], ("queued".to_string(), 0));
+        assert_eq!(documents[1], ("partial".to_string(), 7));
         assert_eq!(documents[2], ("queued".to_string(), 0));
+        assert_eq!(documents[3], ("queued".to_string(), 0));
     }
 
     #[test]
     fn cancels_unfinished_documents_and_keeps_finished_counts() {
         let conn = test_connection();
-        insert_task(&conn, 1, "queued", 3, 1, 0);
+        insert_task(&conn, 1, "queued", 4, 1, 0);
         insert_document(&conn, 1, "success", 15);
+        insert_document(&conn, 1, "partial", 7);
         insert_document(&conn, 1, "queued", 0);
         insert_document(&conn, 1, "running", 2);
 
         mark_task_cancelled(&conn, 1).unwrap();
 
-        let (status, success, failed): (String, i64, i64) = conn
+        let (status, success, partial, failed): (String, i64, i64, i64) = conn
             .query_row(
-                "SELECT status, success, failed FROM conversion_tasks WHERE id = 1",
+                "SELECT status, success, partial, failed FROM conversion_tasks WHERE id = 1",
                 [],
-                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
             )
             .unwrap();
         assert_eq!(status, "cancelled");
         assert_eq!(success, 1);
+        assert_eq!(partial, 1);
         assert_eq!(failed, 0);
 
         let statuses: Vec<String> = conn
@@ -881,6 +1123,9 @@ mod tests {
             .unwrap()
             .filter_map(|row| row.ok())
             .collect();
-        assert_eq!(statuses, vec!["success".to_string(), "cancelled".to_string(), "cancelled".to_string()]);
+        assert_eq!(
+            statuses,
+            vec!["success".to_string(), "partial".to_string(), "cancelled".to_string(), "cancelled".to_string()]
+        );
     }
 }

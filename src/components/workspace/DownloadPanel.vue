@@ -19,9 +19,9 @@ const {
   downloadFilter,
   downloadFilteredItems,
   canDownloadBatch,
+  downloadStatusLabel,
   setDownloadFilter,
   typeLabel,
-  statusLabel,
   handleDownloadDocumentFiles,
   handleDownloadDocumentDrop,
   removeDownloadDocument,
@@ -74,7 +74,7 @@ function confirmClearDocuments() {
       <div v-for="item in downloadDocuments" :key="item.id" class="batch-row" :data-status="item.status">
         <div class="row-info">
           <strong>{{ item.filename }}</strong
-          ><span>{{ statusLabel(item.status) }} · {{ t('download.remoteImages', { count: item.images.length }) }}</span
+          ><span>{{ downloadStatusLabel(item.status) }} · {{ t('download.remoteImages', { count: item.images.length }) }}</span
           ><AppTooltip v-if="item.error" :label="localizeError(item.error)" wrap>
             <small class="error-tip-text">{{ localizeError(item.error) }}</small>
           </AppTooltip>

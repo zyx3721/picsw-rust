@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS conversion_tasks (
     status TEXT NOT NULL,
     total INTEGER NOT NULL DEFAULT 0,
     success INTEGER NOT NULL DEFAULT 0,
+    partial INTEGER NOT NULL DEFAULT 0,
     failed INTEGER NOT NULL DEFAULT 0,
     message TEXT NOT NULL DEFAULT '',
     payload TEXT NOT NULL DEFAULT '',
@@ -29,6 +30,20 @@ CREATE TABLE IF NOT EXISTS conversion_tasks (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_conversion_tasks_status ON conversion_tasks(status);
+
+CREATE TABLE IF NOT EXISTS download_task_images (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id INTEGER NOT NULL REFERENCES conversion_tasks(id) ON DELETE CASCADE,
+    document_index INTEGER NOT NULL,
+    url TEXT NOT NULL,
+    file_name TEXT NOT NULL DEFAULT '',
+    saved_path TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    error TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_download_task_images_task_id ON download_task_images(task_id);
 
 CREATE TABLE IF NOT EXISTS conversion_task_documents (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -76,5 +91,21 @@ pub fn init_db(data_dir: &Path) -> Result<Connection, String> {
     conn.execute_batch("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;")
         .map_err(|e| e.to_string())?;
     conn.execute_batch(SCHEMA).map_err(|e| e.to_string())?;
+    ensure_column(&conn, "conversion_tasks", "partial", "partial INTEGER NOT NULL DEFAULT 0")?;
     Ok(conn)
+}
+
+fn ensure_column(conn: &Connection, table: &str, column: &str, definition: &str) -> Result<(), String> {
+    let existing = conn
+        .prepare(&format!("PRAGMA table_info({table})"))
+        .map_err(|e| e.to_string())?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .filter_map(|row| row.ok())
+        .any(|name| name == column);
+    if existing {
+        return Ok(());
+    }
+    conn.execute_batch(&format!("ALTER TABLE {table} ADD COLUMN {definition}"))
+        .map_err(|e| e.to_string())
 }

@@ -62,6 +62,7 @@ export type ConversionTask = {
   status: string;
   total: number;
   success: number;
+  partial: number;
   failed: number;
   message: string;
   error?: string;
@@ -78,7 +79,7 @@ export type LocalDocument = {
   missing: string[];
   convertedContent: string;
   changed: number;
-  status: 'ready' | 'analyzed' | 'success' | 'failed';
+  status: 'ready' | 'analyzed' | 'success' | 'partial' | 'failed';
   error: string;
 };
 
@@ -96,7 +97,7 @@ export type DownloadDocument = {
   filename: string;
   content: string;
   images: MarkdownImage[];
-  status: 'ready' | 'analyzed' | 'failed';
+  status: 'ready' | 'analyzed' | 'success' | 'partial' | 'failed';
   error: string;
 };
 
@@ -106,12 +107,22 @@ export type DownloadImageItem = {
   name: string;
   url: string;
   picbed: string;
-  status: 'pending' | 'downloading' | 'success' | 'failed';
+  status: 'pending' | 'downloading' | 'success' | 'failed' | 'cancelled';
   error: string;
   savedPath?: string;
 };
 
 export type DownloadImageFilter = 'all' | 'success' | 'failed';
+
+export type DownloadTaskImage = {
+  id: number;
+  document_index: number;
+  url: string;
+  file_name: string;
+  saved_path: string;
+  status: string;
+  error: string;
+};
 
 export type DownloadImageResult = {
   url: string;
@@ -152,7 +163,7 @@ export type TaskDocumentProgress = {
   filename: string;
   total_images: number;
   processed_images: number;
-  status: 'queued' | 'running' | 'success' | 'failed' | 'interrupted' | 'cancelled';
+  status: 'queued' | 'running' | 'success' | 'partial' | 'failed' | 'interrupted' | 'cancelled';
   error: string;
 };
 
@@ -164,6 +175,7 @@ export type TaskProgressState = {
   current: number;
   total: number;
   success: number;
+  partial: number;
   failed: number;
   status: TaskProgressStatus;
   closable: boolean;

@@ -1,37 +1,59 @@
 import { computed, ref, type Ref } from 'vue';
 import { open } from '@tauri-apps/plugin-dialog';
-import { Channel } from '@tauri-apps/api/core';
 import { createClientId } from './api';
 import type {
+  ConversionTask,
   DownloadDocument,
   DownloadImageFilter,
   DownloadImageItem,
-  DownloadImageResult,
-  DownloadProgressEvent,
+  DownloadTaskImage,
   MarkdownImage,
   TaskDocumentProgress,
+  TaskKind,
+  TaskProgressStatus,
 } from './types';
 import { t } from '../../i18n';
+import { localizeBackendText } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
+const DOWNLOAD_WORKSPACE_STORAGE_KEY = 'picbed_download_workspace';
 const LEGACY_DOWNLOAD_DIR_STORAGE_KEY = 'picbed_download_target_dir';
+
+type DownloadTaskData = {
+  task: ConversionTask;
+  documents?: TaskDocumentProgress[];
+  images?: DownloadTaskImage[];
+  resumable?: boolean;
+};
+
+type PersistedDownloadWorkspace = {
+  documents: DownloadDocument[];
+  targetDir: string;
+  activeTaskId?: number;
+  savedAt: number;
+};
 
 type DownloadWorkspaceDeps = {
   request: WorkspaceRequest;
   showMessage: (text: string) => void;
   showError: (text: string) => void;
   loading: Ref<boolean>;
-  startTaskProgress: (input: { title: string; message: string; total: number; detail?: string }) => void;
+  startTaskProgress: (input: { title: string; message: string; total: number; detail?: string; taskId?: number; taskKind?: TaskKind }) => void;
   updateTaskProgress: (input: {
     message?: string;
     detail?: string;
     current?: number;
+    total?: number;
     success?: number;
+    partial?: number;
     failed?: number;
     documents?: TaskDocumentProgress[];
+    taskId?: number;
+    taskKind?: TaskKind;
+    resumable?: boolean;
   }) => void;
-  finishTaskProgress: (input: { status: 'success' | 'failed'; message: string; detail?: string }) => void;
+  finishTaskProgress: (input: { status: Exclude<TaskProgressStatus, 'idle' | 'running'>; message: string; detail?: string; current?: number; resumable?: boolean }) => void;
 };
 
 function decodeURIComponentSafe(value: string) {
@@ -46,6 +68,14 @@ function urlFileName(url: string) {
   const cleanPath = url.split(/[?#]/)[0];
   const last = cleanPath.split('/').filter(Boolean).pop() || 'image';
   return decodeURIComponentSafe(last);
+}
+
+function taskFinished(task: ConversionTask) {
+  return task.status === 'success' || task.status === 'failed' || task.status === 'interrupted' || task.status === 'cancelled';
+}
+
+function waitForNextPoll(ms: number) {
+  return new Promise(resolve => window.setTimeout(resolve, ms));
 }
 
 export function useWorkspaceDownload({
@@ -63,6 +93,8 @@ export function useWorkspaceDownload({
   const downloadTargetDir = ref('');
   const downloadActive = ref(false);
   const downloadFilter = ref<DownloadImageFilter>('all');
+  let activeDownloadTaskId = 0;
+  let downloadPollVersion = 0;
 
   localStorage.removeItem(LEGACY_DOWNLOAD_DIR_STORAGE_KEY);
 
@@ -89,6 +121,46 @@ export function useWorkspaceDownload({
     downloadFilter.value = filter;
   }
 
+  function downloadStatusLabel(status: DownloadDocument['status']) {
+    return {
+      ready: t('download.docStatusReady'),
+      analyzed: t('download.docStatusAnalyzed'),
+      success: t('download.docStatusSuccess'),
+      partial: t('download.docStatusPartial'),
+      failed: t('download.docStatusFailed'),
+    }[status];
+  }
+
+  function readPersistedDownloadWorkspace() {
+    try {
+      const raw = localStorage.getItem(DOWNLOAD_WORKSPACE_STORAGE_KEY);
+      if (!raw) return null;
+      const state = JSON.parse(raw) as PersistedDownloadWorkspace;
+      if (!Array.isArray(state.documents)) return null;
+      return state;
+    } catch {
+      return null;
+    }
+  }
+
+  function persistDownloadWorkspace(taskId = activeDownloadTaskId) {
+    try {
+      const state: PersistedDownloadWorkspace = {
+        documents: downloadDocuments.value,
+        targetDir: downloadTargetDir.value,
+        activeTaskId: taskId || undefined,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(DOWNLOAD_WORKSPACE_STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // 本地存储不可用时任务仍由后端继续执行
+    }
+  }
+
+  function clearPersistedDownloadWorkspace() {
+    localStorage.removeItem(DOWNLOAD_WORKSPACE_STORAGE_KEY);
+  }
+
   function rebuildItems() {
     const items: DownloadImageItem[] = [];
     const seen = new Set<string>();
@@ -109,6 +181,43 @@ export function useWorkspaceDownload({
       }
     }
     downloadItems.value = items;
+  }
+
+  function applyTaskImages(images?: DownloadTaskImage[]) {
+    if (!images?.length) return;
+    const byUrl = new Map(images.map(image => [image.url, image]));
+    for (const item of downloadItems.value) {
+      const row = byUrl.get(item.url);
+      if (!row) continue;
+      if (row.status === 'success') {
+        item.status = 'success';
+        item.error = '';
+        item.savedPath = row.saved_path;
+      } else if (row.status === 'failed') {
+        item.status = 'failed';
+        item.error = row.error || t('msg.download.failed');
+      } else if (row.status === 'cancelled') {
+        item.status = 'cancelled';
+        item.error = '';
+      } else if (row.status === 'running') {
+        item.status = 'downloading';
+        item.error = '';
+      } else {
+        item.status = 'pending';
+        item.error = '';
+      }
+    }
+  }
+
+  function applyTaskDocuments(documents?: TaskDocumentProgress[]) {
+    if (!documents?.length) return;
+    for (const [index, document] of downloadDocuments.value.entries()) {
+      const progress = documents[index];
+      if (!progress) continue;
+      if (progress.status === 'success' || progress.status === 'partial' || progress.status === 'failed') {
+        document.status = progress.status;
+      }
+    }
   }
 
   async function analyzeDownloadDocuments() {
@@ -192,6 +301,77 @@ export function useWorkspaceDownload({
     if (typeof dir === 'string' && dir) downloadTargetDir.value = dir;
   }
 
+  function syncDownloadTaskProgress(task: ConversionTask, documents?: TaskDocumentProgress[]) {
+    updateTaskProgress({
+      current: Math.min(task.success + task.partial + task.failed, task.total),
+      total: task.total,
+      success: task.success,
+      partial: task.partial,
+      failed: task.failed,
+      message: localizeBackendText(task.message) || t('msg.download.taskRunning'),
+      documents,
+    });
+  }
+
+  async function pollDownloadTask(taskId: number, initialDelay = 600) {
+    const currentPollVersion = ++downloadPollVersion;
+    activeDownloadTaskId = taskId;
+    downloadActive.value = true;
+    persistDownloadWorkspace(taskId);
+    if (initialDelay > 0) await waitForNextPoll(initialDelay);
+
+    while (currentPollVersion === downloadPollVersion) {
+      const data = await request<DownloadTaskData>(`/api/convert/tasks/${taskId}`);
+      if (currentPollVersion !== downloadPollVersion) return;
+      syncDownloadTaskProgress(data.task, data.documents);
+      applyTaskImages(data.images);
+
+      if (taskFinished(data.task)) {
+        activeDownloadTaskId = 0;
+        downloadActive.value = false;
+        applyTaskImages(data.images);
+        applyTaskDocuments(data.documents);
+        if (data.task.status === 'interrupted') {
+          activeDownloadTaskId = taskId;
+          persistDownloadWorkspace(taskId);
+          const message = t('msg.download.progressInterrupted');
+          finishTaskProgress({
+            status: 'interrupted',
+            message,
+            detail: t('msg.taskInterruptedHint'),
+            current: data.task.success + data.task.partial + data.task.failed,
+            resumable: data.resumable === true,
+          });
+          showError(message);
+        } else if (data.task.status === 'cancelled') {
+          clearPersistedDownloadWorkspace();
+          finishTaskProgress({
+            status: 'cancelled',
+            message: t('msg.taskCancelled'),
+            current: data.task.success + data.task.partial + data.task.failed,
+          });
+          showMessage(t('msg.taskCancelled'));
+        } else {
+          clearPersistedDownloadWorkspace();
+          const failed = downloadFailedCount.value;
+          const message = failed > 0
+            ? t('msg.download.donePartial', { success: downloadSuccessCount.value, failed })
+            : t('msg.download.done', { success: downloadSuccessCount.value, dir: downloadTargetDir.value.trim() });
+          finishTaskProgress({
+            status: data.task.failed > 0 ? 'failed' : 'success',
+            message: localizeBackendText(data.task.message) || message,
+            detail: t('msg.download.taskDoneHint'),
+          });
+          if (failed > 0 || data.task.failed > 0) showError(message);
+          else showMessage(message);
+        }
+        return;
+      }
+
+      await waitForNextPoll(1200);
+    }
+  }
+
   async function downloadAllImages() {
     if (!canDownloadBatch.value) return;
     const groups = downloadDocuments.value
@@ -211,11 +391,12 @@ export function useWorkspaceDownload({
     }));
     downloadFilter.value = 'all';
     downloadItems.value.forEach(item => {
-      item.status = 'downloading';
+      item.status = 'pending';
       item.error = '';
     });
     downloadActive.value = true;
     startTaskProgress({
+      taskKind: 'download',
       title: t('msg.download.progressTitle'),
       message: t('msg.download.creating'),
       detail: t('msg.download.progressDetail', { documents: groups.length, images: totalImages }),
@@ -223,65 +404,118 @@ export function useWorkspaceDownload({
     });
     updateTaskProgress({ documents: progressDocuments.map(document => ({ ...document })) });
     try {
-      const channel = new Channel<DownloadProgressEvent>();
-      channel.onmessage = progress => {
-        const document = progressDocuments[progress.document_index];
-        if (!document) return;
-        document.processed_images = progress.processed;
-        document.total_images = progress.total;
-        document.status = progress.status;
-        document.error = progress.error;
-        const success = progressDocuments.filter(item => item.status === 'success').length;
-        const failed = progressDocuments.filter(item => item.status === 'failed').length;
-        updateTaskProgress({
-          message: t('msg.download.taskRunning'),
-          current: success + failed,
-          success,
-          failed,
-          documents: progressDocuments.map(item => ({ ...item })),
-        });
-      };
-      const results = await request<DownloadImageResult[]>('/api/download/images', {
+      const created = await request<{ task: ConversionTask }>('/api/download/tasks', {
         method: 'POST',
         body: JSON.stringify({
           documents: groups.map(group => ({ filename: group.document.filename, urls: group.urls })),
           target_dir: downloadTargetDir.value.trim(),
         }),
-        channel,
-      } as RequestInit);
-      const resultsByUrl = new Map(results.map(result => [result.url, result]));
-      downloadItems.value.forEach(item => {
-        const result = resultsByUrl.get(item.url);
-        if (!result) {
-          item.status = 'failed';
-          item.error = t('msg.download.failed');
-          return;
-        }
-        item.status = result.status === 'success' ? 'success' : 'failed';
-        item.error = result.error || '';
-        item.savedPath = result.saved_path || '';
       });
-      const failed = results.filter(result => result.status !== 'success').length;
-      const message = failed === 0
-        ? t('msg.download.done', { success: results.length, dir: downloadTargetDir.value.trim() })
-        : t('msg.download.donePartial', { success: results.length - failed, failed });
-      finishTaskProgress({
-        status: failed === 0 ? 'success' : 'failed',
-        message,
-        detail: t('msg.download.taskDoneHint'),
-      });
-      if (failed === 0) showMessage(message);
-      else showError(message);
+      const taskId = created.task.id;
+      updateTaskProgress({ taskId, taskKind: 'download', message: localizeBackendText(created.task.message) || t('msg.download.taskQueued'), current: 0, success: 0, partial: 0, failed: 0 });
+      await pollDownloadTask(taskId, 0);
     } catch (error) {
-      downloadItems.value.forEach(item => {
-        if (item.status === 'downloading') item.status = 'failed';
-      });
+      downloadActive.value = false;
       const message = error instanceof Error ? error.message : t('msg.download.failed');
       finishTaskProgress({ status: 'failed', message: t('msg.download.taskFailed'), detail: message });
       showError(message);
-    } finally {
-      downloadActive.value = false;
     }
+  }
+
+  async function resumeDownloadTask(taskId: number) {
+    loading.value = true;
+    startTaskProgress({
+      taskId,
+      taskKind: 'download',
+      title: t('msg.download.progressTitle'),
+      message: t('msg.taskResuming'),
+      total: Math.max(downloadDocuments.value.length, 1),
+    });
+    try {
+      await request(`/api/convert/tasks/${taskId}/resume`, { method: 'POST' });
+    } catch (error) {
+      persistDownloadWorkspace(taskId);
+      finishTaskProgress({
+        status: 'interrupted',
+        message: t('msg.taskResumeFailed'),
+        detail: error instanceof Error ? error.message : t('msg.retryHint'),
+        resumable: true,
+      });
+      showError(error instanceof Error ? error.message : t('msg.taskResumeFailed'));
+      loading.value = false;
+      return;
+    }
+    try {
+      persistDownloadWorkspace(taskId);
+      await pollDownloadTask(taskId, 0);
+    } catch (error) {
+      persistDownloadWorkspace(taskId);
+      downloadActive.value = false;
+      finishTaskProgress({
+        status: 'failed',
+        message: t('msg.download.taskFailed'),
+        detail: error instanceof Error ? error.message : t('msg.retryHint'),
+      });
+      showError(error instanceof Error ? error.message : t('msg.download.taskFailed'));
+    } finally {
+      loading.value = false;
+    }
+  }
+
+  async function cancelDownloadTask(taskId: number): Promise<boolean> {
+    try {
+      await request(`/api/convert/tasks/${taskId}/cancel`, { method: 'POST' });
+      updateTaskProgress({ message: t('msg.taskCancelling') });
+      return true;
+    } catch (error) {
+      showError(error instanceof Error ? error.message : t('msg.taskCancelFailed'));
+      return false;
+    }
+  }
+
+  function clearActiveDownloadTaskMarker() {
+    activeDownloadTaskId = 0;
+    clearPersistedDownloadWorkspace();
+  }
+
+  function markCancelledState() {
+    downloadItems.value.forEach(item => {
+      if (item.status === 'pending' || item.status === 'downloading') item.status = 'cancelled';
+    });
+  }
+
+  function restoreDownloadWorkspace(): 'download' | null {
+    const state = readPersistedDownloadWorkspace();
+    if (!state?.activeTaskId) {
+      clearPersistedDownloadWorkspace();
+      return null;
+    }
+    downloadDocuments.value = state.documents;
+    downloadTargetDir.value = state.targetDir || '';
+    rebuildItems();
+    startTaskProgress({
+      taskId: state.activeTaskId,
+      taskKind: 'download',
+      title: t('msg.download.progressTitle'),
+      message: t('msg.convert.progressRestoring'),
+      detail: t('msg.convert.progressRestored', { count: downloadDocuments.value.length }),
+      total: Math.max(downloadDocuments.value.length, 1),
+    });
+    void pollDownloadTask(state.activeTaskId, 0)
+      .catch(error => {
+        persistDownloadWorkspace(state.activeTaskId);
+        downloadActive.value = false;
+        finishTaskProgress({
+          status: 'failed',
+          message: t('msg.download.taskFailed'),
+          detail: error instanceof Error ? error.message : t('msg.retryHint'),
+        });
+        showError(error instanceof Error ? error.message : t('msg.download.taskFailed'));
+      })
+      .finally(() => {
+        loading.value = false;
+      });
+    return 'download';
   }
 
   return {
@@ -296,6 +530,7 @@ export function useWorkspaceDownload({
     downloadFilter,
     downloadFilteredItems,
     canDownloadBatch,
+    downloadStatusLabel,
     setDownloadFilter,
     handleDownloadDocumentFiles,
     handleDownloadDocumentDrop,
@@ -304,5 +539,10 @@ export function useWorkspaceDownload({
     selectDownloadDir,
     analyzeDownloadDocuments,
     downloadAllImages,
+    restoreDownloadWorkspace,
+    resumeDownloadTask,
+    cancelDownloadTask,
+    clearActiveDownloadTaskMarker,
+    markCancelledState,
   };
 }

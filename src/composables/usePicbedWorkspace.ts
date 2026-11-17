@@ -186,6 +186,7 @@ export function usePicbedWorkspace() {
     downloadFilter,
     downloadFilteredItems,
     canDownloadBatch,
+    downloadStatusLabel,
     setDownloadFilter,
     handleDownloadDocumentFiles,
     handleDownloadDocumentDrop,
@@ -194,6 +195,11 @@ export function usePicbedWorkspace() {
     selectDownloadDir,
     analyzeDownloadDocuments,
     downloadAllImages,
+    restoreDownloadWorkspace,
+    resumeDownloadTask,
+    cancelDownloadTask,
+    clearActiveDownloadTaskMarker,
+    markCancelledState: markDownloadCancelledState,
   } = useWorkspaceDownload({
     request,
     showMessage,
@@ -375,6 +381,7 @@ export function usePicbedWorkspace() {
     if (!taskId) return;
     if (taskProgress.taskKind === 'convert') await resumeConvertTask(taskId);
     else if (taskProgress.taskKind === 'localUpload') await resumeLocalUploadTask(taskId);
+    else if (taskProgress.taskKind === 'download') await resumeDownloadTask(taskId);
   }
   async function cancelTaskProgress() {
     const taskId = taskProgress.taskId;
@@ -383,9 +390,12 @@ export function usePicbedWorkspace() {
     let cancelled = false;
     if (taskProgress.taskKind === 'convert') cancelled = await cancelConvertTask(taskId);
     else if (taskProgress.taskKind === 'localUpload') cancelled = await cancelLocalUploadTask(taskId);
+    else if (taskProgress.taskKind === 'download') cancelled = await cancelDownloadTask(taskId);
     if (!cancelled || !wasInterrupted) return;
     if (taskProgress.taskKind === 'convert') clearActiveConvertTaskMarker();
-    else clearActiveLocalUploadTaskMarker();
+    else if (taskProgress.taskKind === 'localUpload') clearActiveLocalUploadTaskMarker();
+    else clearActiveDownloadTaskMarker();
+    if (taskProgress.taskKind === 'download') markDownloadCancelledState();
     updateTaskProgress({
       documents: taskProgress.documents.map(document =>
         document.status === 'success' || document.status === 'failed'
@@ -396,7 +406,7 @@ export function usePicbedWorkspace() {
     finishTaskProgress({
       status: 'cancelled',
       message: t('msg.taskCancelled'),
-      current: taskProgress.success + taskProgress.failed,
+      current: taskProgress.success + taskProgress.partial + taskProgress.failed,
     });
     showMessage(t('msg.taskCancelled'));
   }
@@ -404,8 +414,11 @@ export function usePicbedWorkspace() {
     document.addEventListener('pointerdown', handleGlobalPointerDown);
     void loadWorkspaceData()
       .then(() => {
-        restoreConvertWorkspace();
-        restoreLocalUploadWorkspace();
+        const restoredConvert = restoreConvertWorkspace();
+        const restoredLocal = restoreLocalUploadWorkspace();
+        const restoredDownload = restoreDownloadWorkspace();
+        const restored = restoredConvert || restoredLocal || restoredDownload;
+        if (restored) activeTab.value = restored;
       })
       .catch(err => {
         showError(err instanceof Error ? err.message : t('msg.workspace.initFailed'));
@@ -468,6 +481,7 @@ export function usePicbedWorkspace() {
     downloadFilter,
     downloadFilteredItems,
     canDownloadBatch,
+    downloadStatusLabel,
     setDownloadFilter,
     syncAccount,
     secretBackend,

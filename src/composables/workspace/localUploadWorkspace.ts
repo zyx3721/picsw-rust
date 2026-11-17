@@ -44,6 +44,7 @@ type LocalUploadWorkspaceDeps = {
     current?: number;
     total?: number;
     success?: number;
+    partial?: number;
     failed?: number;
     documents?: TaskDocumentProgress[];
     taskId?: number;
@@ -60,7 +61,7 @@ function taskFinished(task: ConversionTask) {
 }
 
 function taskProgressValue(task: ConversionTask) {
-  return Math.min(task.success + task.failed, task.total);
+  return Math.min(task.success + task.partial + task.failed, task.total);
 }
 
 function waitForNextPoll(ms: number) {
@@ -135,7 +136,7 @@ export function useWorkspaceLocalUpload({
     localImageFilter.value = filter;
   }
   function localStatusLabel(status: LocalDocument['status']) {
-    return { ready: t('msg.local.statusReady'), analyzed: t('msg.local.statusMatched'), success: t('msg.local.statusUploaded'), failed: t('msg.statusFailed') }[status];
+    return { ready: t('msg.local.statusReady'), analyzed: t('msg.local.statusMatched'), success: t('msg.local.statusUploaded'), partial: t('msg.local.statusPartial'), failed: t('msg.statusFailed') }[status];
   }
   function readPersistedLocalUploadWorkspace() {
     try {
@@ -277,6 +278,7 @@ export function useWorkspaceLocalUpload({
       current: taskProgressValue(task),
       total: task.total,
       success: task.success,
+      partial: task.partial,
       failed: task.failed,
       message: localizeBackendText(task.message) || t('msg.local.taskRunning'),
       documents,
@@ -331,7 +333,7 @@ export function useWorkspaceLocalUpload({
             status: 'interrupted',
             message,
             detail: t('msg.taskInterruptedHint'),
-            current: data.task.success + data.task.failed,
+            current: data.task.success + data.task.partial + data.task.failed,
             resumable: data.resumable === true,
           });
           showError(message);
@@ -340,7 +342,7 @@ export function useWorkspaceLocalUpload({
           finishTaskProgress({
             status: 'cancelled',
             message: t('msg.taskCancelled'),
-            current: data.task.success + data.task.failed,
+            current: data.task.success + data.task.partial + data.task.failed,
           });
           showMessage(t('msg.taskCancelled'));
         } else {
@@ -503,13 +505,14 @@ export function useWorkspaceLocalUpload({
       showError(err instanceof Error ? err.message : t('records.saveFailed'));
     }
   }
-  function restoreLocalUploadWorkspace() {
+  function restoreLocalUploadWorkspace(): 'localUpload' | null {
     const state = readPersistedLocalUploadWorkspace();
-    if (!state) return false;
+    if (!state) return null;
     localTargetConfigId.value = state.targetConfigId || localDefaultTarget.value?.id || 0;
     localDocuments.value = state.localDocuments;
     localImages.value = [];
-    if (!state.activeTaskId) return localDocuments.value.length > 0;
+    analyzeLocalMatches();
+    if (!state.activeTaskId) return null;
 
     loading.value = true;
     startTaskProgress({
@@ -534,7 +537,7 @@ export function useWorkspaceLocalUpload({
       .finally(() => {
         loading.value = false;
       });
-    return true;
+    return 'localUpload';
   }
   function analyzeLocalMatches() {
     for (const document of localDocuments.value) {

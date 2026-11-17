@@ -101,12 +101,8 @@ export function createWorkspaceRequest() {
           return await invoke<T>('analyze_markdown', { req: body });
         case 'POST /api/convert/tasks':
           return await invoke<T>('create_convert_task', { req: body });
-        case 'POST /api/download/images':
-          return await invoke<T>('download_remote_images', {
-            documents: body.documents || [],
-            targetDir: body.target_dir || '',
-            onProgress: (options as RequestWithChannel).channel,
-          });
+        case 'POST /api/download/tasks':
+          return await invoke<T>('create_download_task', { req: body });
         case 'GET /api/app/update-runtime':
           return await invoke<T>('get_update_runtime');
         case 'GET /api/app/update-latest':

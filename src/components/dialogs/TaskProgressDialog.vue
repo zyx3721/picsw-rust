@@ -16,11 +16,25 @@ const progressPercent = computed(() => {
   return Math.min(100, Math.round((taskProgress.current / taskProgress.total) * 100));
 });
 const isRunning = computed(() => taskProgress.status === 'running');
-const supportsTaskActions = computed(() => taskProgress.taskKind === 'convert' || taskProgress.taskKind === 'localUpload');
+const supportsTaskActions = computed(
+  () => taskProgress.taskKind === 'convert' || taskProgress.taskKind === 'localUpload' || taskProgress.taskKind === 'download'
+);
 const cancellable = computed(
   () => supportsTaskActions.value && (taskProgress.status === 'running' || taskProgress.status === 'interrupted')
 );
 const showFooter = computed(() => supportsTaskActions.value || !isRunning.value);
+const resumeLabel = computed(() => {
+  if (taskProgress.taskKind === 'convert') return t('dlg.task.resumeConvert');
+  if (taskProgress.taskKind === 'localUpload') return t('dlg.task.resumeUpload');
+  if (taskProgress.taskKind === 'download') return t('dlg.task.resumeDownload');
+  return t('dlg.task.resume');
+});
+const cancelLabel = computed(() => {
+  if (taskProgress.taskKind === 'convert') return t('dlg.task.cancelConvert');
+  if (taskProgress.taskKind === 'localUpload') return t('dlg.task.cancelUpload');
+  if (taskProgress.taskKind === 'download') return t('dlg.task.cancelDownload');
+  return t('dlg.task.cancel');
+});
 const runningDocumentCount = computed(
   () => taskProgress.documents.filter(document => document.status === 'running').length
 );
@@ -36,6 +50,7 @@ function documentStatusLabel(status: TaskDocumentProgress['status']) {
     queued: t('dlg.task.docQueued'),
     running: t('dlg.task.docRunning'),
     success: t('dlg.task.docSuccess'),
+    partial: t('dlg.task.docPartial'),
     failed: t('dlg.task.docFailed'),
     interrupted: t('dlg.task.docInterrupted'),
     cancelled: t('dlg.task.docCancelled'),
@@ -70,6 +85,7 @@ function documentCountLabel(document: TaskDocumentProgress) {
       <div class="task-progress-stats">
         <span>{{ t('dlg.task.progress', { current: taskProgress.current, total: taskProgress.total }) }}</span>
         <span>{{ t('dlg.task.successCount', { count: taskProgress.success }) }}</span>
+        <span>{{ t('dlg.task.partialCount', { count: taskProgress.partial }) }}</span>
         <span>{{ t('dlg.task.failedCount', { count: taskProgress.failed }) }}</span>
       </div>
       <div v-if="taskProgress.documents.length" class="task-progress-docs" aria-live="polite">
@@ -104,10 +120,10 @@ function documentCountLabel(document: TaskDocumentProgress) {
       <div v-if="showFooter" class="dialog-actions task-progress-actions">
         <template v-if="supportsTaskActions">
           <button class="success-action" type="button" :disabled="!taskProgress.resumable" @click="resumeTaskProgress">
-            {{ t('dlg.task.resume') }}
+            {{ resumeLabel }}
           </button>
           <button class="danger" type="button" :disabled="!cancellable" @click="cancelTaskProgress">
-            {{ t('dlg.task.cancel') }}
+            {{ cancelLabel }}
           </button>
         </template>
         <button v-if="!isRunning" class="primary" type="button" @click="closeTaskProgress">{{ t('common.close') }}</button>

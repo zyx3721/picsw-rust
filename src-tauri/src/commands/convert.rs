@@ -34,7 +34,7 @@ pub struct DeleteRecordsRequest {
     pub ids: Vec<i64>,
 }
 
-fn lock_db(state: &AppState) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, String> {
+pub(crate) fn lock_db(state: &AppState) -> Result<std::sync::MutexGuard<'_, rusqlite::Connection>, String> {
     state.db.lock().map_err(|_| "数据库连接异常".to_string())
 }
 
@@ -215,7 +215,36 @@ pub fn get_convert_task(state: State<AppState>, id: i64) -> Result<Value, String
         .filter_map(|record_id| load_record_with_details(&conn, *record_id))
         .collect();
     let documents = load_task_documents(&conn, id);
-    Ok(json!({ "task": task, "records": records, "documents": documents, "resumable": resumable }))
+    let images = if task.get("task_type").and_then(|value| value.as_str()) == Some("download") {
+        load_download_images(&conn, id)
+    } else {
+        Vec::new()
+    };
+    Ok(json!({ "task": task, "records": records, "documents": documents, "images": images, "resumable": resumable }))
+}
+
+fn load_download_images(conn: &rusqlite::Connection, task_id: i64) -> Vec<Value> {
+    let mut stmt = match conn.prepare(
+        "SELECT id, document_index, url, file_name, saved_path, status, error FROM download_task_images WHERE task_id = ?1 ORDER BY id ASC",
+    ) {
+        Ok(stmt) => stmt,
+        Err(_) => return Vec::new(),
+    };
+    let rows = stmt.query_map([task_id], |row| {
+        Ok(json!({
+            "id": row.get::<_, i64>(0)?,
+            "document_index": row.get::<_, i64>(1)?,
+            "url": row.get::<_, String>(2)?,
+            "file_name": row.get::<_, String>(3)?,
+            "saved_path": row.get::<_, String>(4)?,
+            "status": row.get::<_, String>(5)?,
+            "error": row.get::<_, String>(6)?,
+        }))
+    });
+    match rows {
+        Ok(rows) => rows.filter_map(|row| row.ok()).collect(),
+        Err(_) => Vec::new(),
+    }
 }
 
 #[tauri::command]
@@ -339,9 +368,9 @@ fn fail_task(state: &State<'_, AppState>, task_id: i64, message: &str, error: &s
     });
 }
 
-fn load_task_json(conn: &rusqlite::Connection, task_id: i64) -> Option<Value> {
+pub(crate) fn load_task_json(conn: &rusqlite::Connection, task_id: i64) -> Option<Value> {
     conn.query_row(
-        "SELECT id, task_type, status, total, success, failed, message, error, started_at, ended_at, created_at, updated_at FROM conversion_tasks WHERE id = ?1",
+        "SELECT id, task_type, status, total, success, partial, failed, message, error, started_at, ended_at, created_at, updated_at FROM conversion_tasks WHERE id = ?1",
         [task_id],
         |row| {
             Ok(json!({
@@ -350,13 +379,14 @@ fn load_task_json(conn: &rusqlite::Connection, task_id: i64) -> Option<Value> {
                 "status": row.get::<_, String>(2)?,
                 "total": row.get::<_, i64>(3)?,
                 "success": row.get::<_, i64>(4)?,
-                "failed": row.get::<_, i64>(5)?,
-                "message": row.get::<_, String>(6)?,
-                "error": row.get::<_, Option<String>>(7)?,
-                "started_at": row.get::<_, Option<String>>(8)?,
-                "ended_at": row.get::<_, Option<String>>(9)?,
-                "created_at": row.get::<_, String>(10)?,
-                "updated_at": row.get::<_, String>(11)?,
+                "partial": row.get::<_, i64>(5)?,
+                "failed": row.get::<_, i64>(6)?,
+                "message": row.get::<_, String>(7)?,
+                "error": row.get::<_, Option<String>>(8)?,
+                "started_at": row.get::<_, Option<String>>(9)?,
+                "ended_at": row.get::<_, Option<String>>(10)?,
+                "created_at": row.get::<_, String>(11)?,
+                "updated_at": row.get::<_, String>(12)?,
             }))
         },
     )
@@ -372,7 +402,7 @@ fn document_image_total(content: &str) -> i64 {
         .count() as i64
 }
 
-fn insert_task_documents(conn: &rusqlite::Connection, task_id: i64, documents: &[(String, i64)]) -> rusqlite::Result<()> {
+pub(crate) fn insert_task_documents(conn: &rusqlite::Connection, task_id: i64, documents: &[(String, i64)]) -> rusqlite::Result<()> {
     let now = now_string();
     for (filename, total_images) in documents {
         conn.execute(

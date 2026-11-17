@@ -50,6 +50,22 @@ pub struct LocalBatchManifest {
     pub documents: Vec<LocalMarkdownDocument>,
 }
 
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DownloadDocumentSpec {
+    #[serde(default)]
+    pub filename: String,
+    #[serde(default)]
+    pub urls: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DownloadTaskPayload {
+    #[serde(default)]
+    pub documents: Vec<DownloadDocumentSpec>,
+    #[serde(default)]
+    pub target_dir: String,
+}
+
 pub struct ConfigRow {
     pub id: i64,
     pub picbed_type: String,

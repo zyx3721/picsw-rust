@@ -23,7 +23,7 @@ function taskFinished(task: ConversionTask) {
 }
 
 function taskProgressValue(task: ConversionTask) {
-  return Math.min(task.success + task.failed, task.total);
+  return Math.min(task.success + task.partial + task.failed, task.total);
 }
 
 function waitForNextPoll(ms: number) {
@@ -46,6 +46,7 @@ type ConvertWorkspaceDeps = {
     current?: number;
     total?: number;
     success?: number;
+    partial?: number;
     failed?: number;
     documents?: TaskDocumentProgress[];
     taskId?: number;
@@ -156,6 +157,7 @@ export function useWorkspaceConvert({
       current: taskProgressValue(task),
       total: task.total,
       success: task.success,
+      partial: task.partial,
       failed: task.failed,
       message: localizeBackendText(task.message) || t('msg.convert.taskRunning'),
       documents,
@@ -332,7 +334,7 @@ export function useWorkspaceConvert({
             status: 'interrupted',
             message,
             detail: t('msg.taskInterruptedHint'),
-            current: data.task.success + data.task.failed,
+            current: data.task.success + data.task.partial + data.task.failed,
             resumable: data.resumable === true,
           });
           showError(message);
@@ -341,7 +343,7 @@ export function useWorkspaceConvert({
           finishTaskProgress({
             status: 'cancelled',
             message: t('msg.taskCancelled'),
-            current: data.task.success + data.task.failed,
+            current: data.task.success + data.task.partial + data.task.failed,
           });
           showMessage(t('msg.taskCancelled'));
         } else {
@@ -363,12 +365,12 @@ export function useWorkspaceConvert({
       await waitForNextPoll(1200);
     }
   }
-  function restoreConvertWorkspace() {
+  function restoreConvertWorkspace(): 'convert' | null {
     const state = readPersistedConvertWorkspace();
-    if (!state) return false;
+    if (!state) return null;
     convertForm.target_config_id = state.targetConfigId || defaultTarget.value?.id || 0;
     batchFiles.value = state.batchFiles;
-    if (!state.activeTaskId) return batchFiles.value.length > 0;
+    if (!state.activeTaskId) return null;
 
     loading.value = true;
     startTaskProgress({
@@ -393,7 +395,7 @@ export function useWorkspaceConvert({
       .finally(() => {
         loading.value = false;
       });
-    return true;
+    return 'convert';
   }
   async function runConvertBatch(githubProxyURLForConvert: string) {
     loading.value = true;

@@ -10,7 +10,7 @@ type StartTaskInput = {
   taskKind?: TaskKind;
 };
 
-type UpdateTaskInput = Partial<Pick<TaskProgressState, 'message' | 'detail' | 'current' | 'success' | 'failed' | 'documents' | 'total' | 'taskId' | 'taskKind' | 'resumable'>> & {
+type UpdateTaskInput = Partial<Pick<TaskProgressState, 'message' | 'detail' | 'current' | 'success' | 'partial' | 'failed' | 'documents' | 'total' | 'taskId' | 'taskKind' | 'resumable'>> & {
   status?: TaskProgressStatus;
 };
 
@@ -23,6 +23,7 @@ export function useTaskProgress() {
     current: 0,
     total: 0,
     success: 0,
+    partial: 0,
     failed: 0,
     status: 'idle',
     closable: true,
@@ -40,6 +41,7 @@ export function useTaskProgress() {
     taskProgress.current = 0;
     taskProgress.total = input.total;
     taskProgress.success = 0;
+    taskProgress.partial = 0;
     taskProgress.failed = 0;
     taskProgress.status = 'running';
     taskProgress.closable = false;
@@ -55,6 +57,7 @@ export function useTaskProgress() {
     if (input.current !== undefined) taskProgress.current = input.current;
     if (input.total !== undefined) taskProgress.total = input.total;
     if (input.success !== undefined) taskProgress.success = input.success;
+    if (input.partial !== undefined) taskProgress.partial = input.partial;
     if (input.failed !== undefined) taskProgress.failed = input.failed;
     if (input.documents !== undefined) taskProgress.documents = input.documents;
     if (input.taskId !== undefined) taskProgress.taskId = input.taskId;
