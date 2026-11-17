@@ -283,6 +283,7 @@ export function useWorkspaceDownload({
       await analyzeDownloadDocuments();
     } finally {
       loading.value = false;
+      if (downloadDocuments.value.length) persistDownloadWorkspace();
     }
   }
 
