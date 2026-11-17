@@ -82,6 +82,10 @@ export const en: Record<keyof typeof zh, string> = {
   'download.start': 'Download All Images',
   'download.downloading': 'Downloading…',
   'download.remoteImages': '{count} remote images',
+  'download.docCount': 'Documents {count}',
+  'download.clearAllTitle': 'Clear Remote Documents',
+  'download.clearAllDesc': 'Remove all {count} documents? The remote image list will be cleared too; downloaded files are not affected.',
+  'download.clearAllConfirm': 'Clear Documents',
 
   'config.editTitle': 'Edit Picbed Config',
   'config.addTitle': 'New Picbed Config',
@@ -436,6 +440,7 @@ export const en: Record<keyof typeof zh, string> = {
   'msg.download.done': 'Download finished: {success} images succeeded, saved to {dir}',
   'msg.download.donePartial': 'Download finished: {success} images succeeded, {failed} failed',
   'msg.download.failed': 'Image download failed',
+  'msg.download.cleared': 'Removed {count} documents',
 
   'msg.config.updated': 'Config updated',
   'msg.config.saved': 'Config saved',

@@ -80,6 +80,10 @@ export const zh = {
   'download.start': '下载全部图片',
   'download.downloading': '下载中…',
   'download.remoteImages': '{count} 个网络图片',
+  'download.docCount': '文档 {count} 个',
+  'download.clearAllTitle': '清空网络图片文档',
+  'download.clearAllDesc': '确认移除全部 {count} 个文档吗？网络图片列表会一并清空，已下载的本地文件不受影响',
+  'download.clearAllConfirm': '清空文档',
 
   'config.editTitle': '编辑图床配置',
   'config.addTitle': '新增图床配置',
@@ -434,6 +438,7 @@ export const zh = {
   'msg.download.done': '下载完成：成功 {success} 张，已保存到 {dir}',
   'msg.download.donePartial': '下载完成：成功 {success} 张，失败 {failed} 张',
   'msg.download.failed': '下载图片失败',
+  'msg.download.cleared': '已移除 {count} 个文档',
 
   'msg.config.updated': '配置已更新',
   'msg.config.saved': '配置已保存',

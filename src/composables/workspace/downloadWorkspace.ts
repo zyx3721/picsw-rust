@@ -140,6 +140,14 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
     rebuildItems();
   }
 
+  function clearDownloadDocuments() {
+    const count = downloadDocuments.value.length;
+    if (!count) return;
+    downloadDocuments.value = [];
+    downloadItems.value = [];
+    showMessage(t('msg.download.cleared', { count }));
+  }
+
   async function selectDownloadDir() {
     const dir = await open({ directory: true, multiple: false });
     if (typeof dir === 'string' && dir) downloadTargetDir.value = dir;
@@ -194,6 +202,7 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
     handleDownloadDocumentFiles,
     handleDownloadDocumentDrop,
     removeDownloadDocument,
+    clearDownloadDocuments,
     selectDownloadDir,
     analyzeDownloadDocuments,
     downloadAllImages,

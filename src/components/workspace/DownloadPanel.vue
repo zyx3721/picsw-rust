@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { DownloadCloud, FileSearch, FolderOpen, Trash2, UploadCloud } from 'lucide-vue-next';
+import { ref } from 'vue';
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import { t } from '../../i18n';
@@ -21,10 +22,19 @@ const {
   handleDownloadDocumentFiles,
   handleDownloadDocumentDrop,
   removeDownloadDocument,
+  clearDownloadDocuments,
   selectDownloadDir,
   analyzeDownloadDocuments,
   downloadAllImages,
 } = useWorkspaceContext();
+
+const clearConfirmOpen = ref(false);
+
+/// 确认后清空网络图片文档与识别结果
+function confirmClearDocuments() {
+  clearConfirmOpen.value = false;
+  clearDownloadDocuments();
+}
 </script>
 
 <template>
@@ -45,6 +55,17 @@ const {
         ><UploadCloud :size="18" /><span>{{ t('convert.uploadHint') }}</span
         ><input type="file" multiple accept=".md,text/markdown" @change="handleDownloadDocumentFiles"
       /></label>
+    </div>
+    <div v-if="downloadDocuments.length" class="batch-list-head">
+      <span>{{ t('download.docCount', { count: downloadDocuments.length }) }}</span>
+      <button
+        class="ghost danger-text"
+        type="button"
+        :disabled="loading || downloadActive"
+        @click="clearConfirmOpen = true"
+      >
+        <Trash2 :size="15" />{{ t('convert.clearAll') }}
+      </button>
     </div>
     <div class="batch-list local-list">
       <div v-for="item in downloadDocuments" :key="item.id" class="batch-row" :data-status="item.status">
@@ -127,5 +148,24 @@ const {
       </div>
     </div>
   </div>
+  <Teleport to="body">
+    <div v-if="clearConfirmOpen" class="modal-backdrop" role="presentation" @click.self="clearConfirmOpen = false">
+      <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-download-title">
+        <div class="dialog-head">
+          <div class="dialog-icon"><Trash2 :size="22" /></div>
+          <h2 id="clear-download-title">{{ t('download.clearAllTitle') }}</h2>
+        </div>
+        <div class="dialog-copy">
+          <p>{{ t('download.clearAllDesc', { count: downloadDocuments.length }) }}</p>
+        </div>
+        <div class="dialog-actions">
+          <button class="ghost" type="button" @click="clearConfirmOpen = false">{{ t('common.cancel') }}</button>
+          <button class="danger" type="button" @click="confirmClearDocuments">
+            <Trash2 :size="17" />{{ t('download.clearAllConfirm') }}
+          </button>
+        </div>
+      </section>
+    </div>
+  </Teleport>
 </section>
 </template>
