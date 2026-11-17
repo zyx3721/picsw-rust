@@ -594,9 +594,13 @@ export function useWorkspaceLocalUpload({
     const state = readPersistedLocalUploadWorkspace();
     if (!state) return null;
     localTargetConfigId.value = state.targetConfigId || localDefaultTarget.value?.id || 0;
-    localDocuments.value = state.localDocuments;
+    localDocuments.value = state.localDocuments.map(document => {
+      const completed =
+        document.status === 'success' || document.status === 'partial' || document.status === 'failed';
+      if (!completed) return document;
+      return { ...document, matched: localReferenceSources(document.content).length, missing: [] };
+    });
     localImages.value = [];
-    analyzeLocalMatches();
     if (!state.activeTaskId) return null;
 
     loading.value = true;
@@ -624,17 +628,22 @@ export function useWorkspaceLocalUpload({
       });
     return 'localUpload';
   }
+  function localReferenceSources(content: string) {
+    const sources: string[] = [];
+    const seen = new Set<string>();
+    for (const reference of extractMarkdownImages(content)) {
+      if (!isLocalImageReference(reference.url)) continue;
+      const source = reference.url.trim();
+      if (seen.has(source)) continue;
+      seen.add(source);
+      sources.push(source);
+    }
+    return sources;
+  }
   function analyzeLocalMatches() {
     for (const document of localDocuments.value) {
       const references = extractMarkdownImages(document.content).filter(image => isLocalImageReference(image.url));
-      const uniqueSources: string[] = [];
-      const seen = new Set<string>();
-      for (const reference of references) {
-        const source = reference.url.trim();
-        if (seen.has(source)) continue;
-        seen.add(source);
-        uniqueSources.push(source);
-      }
+      const uniqueSources = localReferenceSources(document.content);
       const missing: string[] = [];
       let matched = 0;
       for (const source of uniqueSources) {
