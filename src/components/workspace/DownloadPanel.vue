@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { DownloadCloud, FileSearch, FolderOpen, Trash2, UploadCloud } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import type { DownloadDocument } from '../../composables/workspace/types';
@@ -33,6 +33,20 @@ const {
 } = useWorkspaceContext();
 
 const clearConfirmOpen = ref(false);
+const downloadListSummary = computed(() => {
+  let images = 0;
+  let duplicates = 0;
+  for (const document of downloadDocuments.value) {
+    images += document.images.length;
+    const uniqueImages = new Set(document.images.map(image => image.url.trim())).size;
+    duplicates += Math.max(0, document.images.length - uniqueImages);
+  }
+  return t('download.listSummary', {
+    documents: downloadDocuments.value.length,
+    images,
+    duplicateSuffix: duplicates > 0 ? t('download.duplicateSuffix', { count: duplicates }) : '',
+  });
+});
 
 function remoteImagesLabel(item: DownloadDocument) {
   const uniqueImages = new Set(item.images.map(image => image.url.trim())).size;
@@ -67,7 +81,7 @@ function confirmClearDocuments() {
       /></label>
     </div>
     <div v-if="downloadDocuments.length" class="batch-list-head">
-      <span>{{ t('download.docCount', { count: downloadDocuments.length }) }}</span>
+      <span>{{ downloadListSummary }}</span>
       <button
         class="ghost danger-text"
         type="button"

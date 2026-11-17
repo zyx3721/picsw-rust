@@ -50,6 +50,19 @@ type ClearTarget = 'documents' | 'images';
 
 const clearTarget = ref<ClearTarget | null>(null);
 const pendingScan = ref<ScannedLocalImage[] | null>(null);
+const localListSummary = computed(() => {
+  let references = 0;
+  let duplicates = 0;
+  for (const document of localDocuments.value) {
+    references += document.references.length;
+    duplicates += Math.max(0, document.references.length - (document.matched + document.missing.length));
+  }
+  return t('local.listSummary', {
+    documents: localDocuments.value.length,
+    references,
+    duplicateSuffix: duplicates > 0 ? t('local.duplicateSuffix', { count: duplicates }) : '',
+  });
+});
 const clearCount = computed(() =>
   clearTarget.value === 'images' ? localImages.value.length : localDocuments.value.length
 );
@@ -127,7 +140,7 @@ function confirmScan() {
       /></label>
     </div>
     <div v-if="localDocuments.length" class="batch-list-head">
-      <span>{{ t('local.docCount', { count: localDocuments.length }) }}</span>
+      <span>{{ localListSummary }}</span>
       <button class="ghost danger-text" type="button" :disabled="loading" @click="clearTarget = 'documents'">
         <Trash2 :size="15" />{{ t('convert.clearAll') }}
       </button>
