@@ -16,7 +16,10 @@ const {
   downloadTotalCount,
   downloadSuccessCount,
   downloadFailedCount,
+  downloadFilter,
+  downloadFilteredItems,
   canDownloadBatch,
+  setDownloadFilter,
   typeLabel,
   statusLabel,
   handleDownloadDocumentFiles,
@@ -92,14 +95,38 @@ function confirmClearDocuments() {
         <h2>{{ t('download.imagesTitle') }}</h2>
       </div>
     </div>
-    <div class="local-summary">
-      <span>{{ t('download.imagesCount', { count: downloadTotalCount }) }}</span>
-      <span>{{ t('download.successCount', { count: downloadSuccessCount }) }}</span>
-      <span>{{ t('download.failedCount', { count: downloadFailedCount }) }}</span>
+    <div class="local-summary summary-filters" role="group" :aria-label="t('download.filterGroup')">
+      <button
+        class="summary-filter"
+        :class="{ active: downloadFilter === 'all' }"
+        type="button"
+        :aria-pressed="downloadFilter === 'all'"
+        @click="setDownloadFilter('all')"
+      >
+        {{ t('download.imagesCount', { count: downloadTotalCount }) }}
+      </button>
+      <button
+        class="summary-filter"
+        :class="{ active: downloadFilter === 'success' }"
+        type="button"
+        :aria-pressed="downloadFilter === 'success'"
+        @click="setDownloadFilter('success')"
+      >
+        {{ t('download.successCount', { count: downloadSuccessCount }) }}
+      </button>
+      <button
+        class="summary-filter"
+        :class="{ active: downloadFilter === 'failed' }"
+        type="button"
+        :aria-pressed="downloadFilter === 'failed'"
+        @click="setDownloadFilter('failed')"
+      >
+        {{ t('download.failedCount', { count: downloadFailedCount }) }}
+      </button>
     </div>
     <div class="batch-list local-image-list">
       <div
-        v-for="image in downloadItems"
+        v-for="image in downloadFilteredItems"
         :key="image.key"
         class="batch-row local-image-row"
         :data-status="image.status"
@@ -115,7 +142,9 @@ function confirmClearDocuments() {
         </div>
         <small>{{ typeLabel(image.picbed) }}</small>
       </div>
-      <p v-if="downloadItems.length === 0" class="empty">{{ t('download.listEmpty') }}</p>
+      <p v-if="downloadFilteredItems.length === 0" class="empty">
+        {{ downloadItems.length ? t('download.filterEmpty') : t('download.listEmpty') }}
+      </p>
     </div>
   </div>
   <div class="panel stack local-action-panel">

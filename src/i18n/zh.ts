@@ -84,6 +84,8 @@ export const zh = {
   'download.clearAllTitle': '清空网络图片文档',
   'download.clearAllDesc': '确认移除全部 {count} 个文档吗？网络图片列表会一并清空，已下载的本地文件不受影响',
   'download.clearAllConfirm': '清空文档',
+  'download.filterGroup': '图片状态筛选',
+  'download.filterEmpty': '当前筛选下没有图片',
 
   'config.editTitle': '编辑图床配置',
   'config.addTitle': '新增图床配置',

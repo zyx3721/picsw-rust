@@ -1617,16 +1617,34 @@ svg {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
-.local-summary span {
+.summary-filter {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--surface-muted);
   color: var(--muted);
   font-weight: 800;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+.summary-filter:hover:not(.active) {
+  border-color: var(--primary);
+  background: var(--surface);
+  color: var(--text);
+}
+.summary-filter.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary-strong);
+  box-shadow: inset 0 0 0 1px rgba(19, 184, 166, 0.16);
+}
+.summary-filter:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
 }
 .field-row {
   display: grid;

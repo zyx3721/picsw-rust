@@ -100,6 +100,7 @@ export type DownloadDocument = {
 
 export type DownloadImageItem = {
   key: string;
+  docId: string;
   name: string;
   url: string;
   picbed: string;
@@ -107,6 +108,8 @@ export type DownloadImageItem = {
   error: string;
   savedPath?: string;
 };
+
+export type DownloadImageFilter = 'all' | 'success' | 'failed';
 
 export type DownloadImageResult = {
   url: string;

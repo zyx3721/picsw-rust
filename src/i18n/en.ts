@@ -86,6 +86,8 @@ export const en: Record<keyof typeof zh, string> = {
   'download.clearAllTitle': 'Clear Remote Documents',
   'download.clearAllDesc': 'Remove all {count} documents? The remote image list will be cleared too; downloaded files are not affected.',
   'download.clearAllConfirm': 'Clear Documents',
+  'download.filterGroup': 'Image status filter',
+  'download.filterEmpty': 'No images in this filter',
 
   'config.editTitle': 'Edit Picbed Config',
   'config.addTitle': 'New Picbed Config',

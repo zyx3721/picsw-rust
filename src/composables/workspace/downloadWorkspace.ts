@@ -1,7 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue';
 import { open } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
-import type { DownloadDocument, DownloadImageItem, DownloadImageResult, MarkdownImage } from './types';
+import type { DownloadDocument, DownloadImageFilter, DownloadImageItem, DownloadImageResult, MarkdownImage } from './types';
 import { t } from '../../i18n';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
@@ -35,6 +35,7 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
   const downloadItems = ref<DownloadImageItem[]>([]);
   const downloadTargetDir = ref(localStorage.getItem(DOWNLOAD_DIR_STORAGE_KEY) || '');
   const downloadActive = ref(false);
+  const downloadFilter = ref<DownloadImageFilter>('all');
 
   watch(downloadTargetDir, value => localStorage.setItem(DOWNLOAD_DIR_STORAGE_KEY, value));
 
@@ -45,12 +46,21 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
   const downloadFailedCount = computed(
     () => downloadItems.value.filter(item => item.status === 'failed').length
   );
+  const downloadFilteredItems = computed(() =>
+    downloadFilter.value === 'all'
+      ? downloadItems.value
+      : downloadItems.value.filter(item => item.status === downloadFilter.value)
+  );
   const canDownloadBatch = computed(
     () =>
       !downloadActive.value &&
       downloadItems.value.length > 0 &&
       downloadTargetDir.value.trim().length > 0
   );
+
+  function setDownloadFilter(filter: DownloadImageFilter) {
+    downloadFilter.value = filter;
+  }
 
   function rebuildItems() {
     const items: DownloadImageItem[] = [];
@@ -62,6 +72,7 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
         seen.add(url);
         items.push({
           key: `${doc.id}-${url}`,
+          docId: doc.id,
           name: urlFileName(url),
           url,
           picbed: image.picbed,
@@ -145,6 +156,7 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
     if (!count) return;
     downloadDocuments.value = [];
     downloadItems.value = [];
+    downloadFilter.value = 'all';
     showMessage(t('msg.download.cleared', { count }));
   }
 
@@ -156,6 +168,7 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
   async function downloadAllImages() {
     if (!canDownloadBatch.value) return;
     const urls = downloadItems.value.map(item => item.url);
+    downloadFilter.value = 'all';
     downloadItems.value.forEach(item => {
       item.status = 'downloading';
       item.error = '';
@@ -198,7 +211,10 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
     downloadTotalCount,
     downloadSuccessCount,
     downloadFailedCount,
+    downloadFilter,
+    downloadFilteredItems,
     canDownloadBatch,
+    setDownloadFilter,
     handleDownloadDocumentFiles,
     handleDownloadDocumentDrop,
     removeDownloadDocument,
