@@ -1617,6 +1617,9 @@ svg {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
+.download-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
 .summary-filter {
   min-height: 40px;
   display: inline-flex;

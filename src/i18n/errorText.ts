@@ -184,6 +184,7 @@ const RULES: TranslationRule[] = [
   { pattern: /^转换完成，成功 (\d+) 个，部分 (\d+) 个，失败 (\d+) 个$/, replacement: 'Conversion finished: $1 succeeded, $2 partial, $3 failed' },
   { pattern: /^本地图片上传完成，成功 (\d+) 个，部分 (\d+) 个，失败 (\d+) 个$/, replacement: 'Local upload finished: $1 succeeded, $2 partial, $3 failed' },
   { pattern: /^下载完成，成功 (\d+) 个，部分 (\d+) 个，失败 (\d+) 个$/, replacement: 'Download finished: $1 succeeded, $2 partial, $3 failed' },
+  { pattern: /^下载完成，成功 (\d+) 个，部分 (\d+) 个，失败 (\d+) 个，跳过 (\d+) 张已存在图片$/, replacement: 'Download finished: $1 succeeded, $2 partial, $3 failed, $4 skipped (already exists)' },
   { pattern: /^下载任务已加入队列$/, replacement: 'Download task queued' },
   { pattern: /^下载任务执行中$/, replacement: 'Download task running' },
   { pattern: /^下载任务载荷解析失败$/, replacement: 'Failed to parse the download task payload' },

@@ -1,7 +1,7 @@
 //! 网络图片下载任务创建与下载文件写入辅助
 
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::Deserialize;
 use tauri::State;
@@ -136,29 +136,6 @@ pub(crate) fn write_atomically(path: &Path, data: &[u8]) -> std::io::Result<()> 
             Err(error)
         }
     }
-}
-
-/// 同名文件自动追加序号，避免覆盖已下载内容
-pub(crate) fn unique_target(dir: &Path, filename: &str) -> PathBuf {
-    let trimmed = filename.trim();
-    let name = if trimmed.is_empty() { "image.png" } else { trimmed };
-    let stem = Path::new(name)
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("image")
-        .to_string();
-    let ext = Path::new(name)
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|s| format!(".{s}"))
-        .unwrap_or_default();
-    let mut index = 1u32;
-    let mut candidate = dir.join(name);
-    while candidate.exists() {
-        candidate = dir.join(format!("{stem} ({index}){ext}"));
-        index += 1;
-    }
-    candidate
 }
 
 #[cfg(test)]

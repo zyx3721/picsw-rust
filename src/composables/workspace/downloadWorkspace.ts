@@ -106,6 +106,9 @@ export function useWorkspaceDownload({
   const downloadFailedCount = computed(
     () => downloadItems.value.filter(item => item.status === 'failed').length
   );
+  const downloadSkippedCount = computed(
+    () => downloadItems.value.filter(item => item.status === 'skipped').length
+  );
   const downloadFilteredItems = computed(() =>
     downloadFilter.value === 'all'
       ? downloadItems.value
@@ -206,6 +209,10 @@ export function useWorkspaceDownload({
       if (!row) continue;
       if (row.status === 'success') {
         item.status = 'success';
+        item.error = '';
+        item.savedPath = row.saved_path;
+      } else if (row.status === 'skipped') {
+        item.status = 'skipped';
         item.error = '';
         item.savedPath = row.saved_path;
       } else if (row.status === 'failed') {
@@ -378,9 +385,11 @@ export function useWorkspaceDownload({
         } else {
           persistDownloadWorkspace(0);
           const failed = downloadFailedCount.value;
+          const skipped = downloadSkippedCount.value;
+          const skipSuffix = skipped > 0 ? t('msg.download.skippedSuffix', { count: skipped }) : '';
           const message = failed > 0
-            ? t('msg.download.donePartial', { success: downloadSuccessCount.value, failed })
-            : t('msg.download.done', { success: downloadSuccessCount.value, dir: downloadTargetDir.value.trim() });
+            ? `${t('msg.download.donePartial', { success: downloadSuccessCount.value, failed })}${skipSuffix}`
+            : `${t('msg.download.done', { success: downloadSuccessCount.value, dir: downloadTargetDir.value.trim() })}${skipSuffix}`;
           finishTaskProgress({
             status: data.task.failed > 0 ? 'failed' : 'success',
             message: localizeBackendText(data.task.message) || message,
@@ -555,6 +564,7 @@ export function useWorkspaceDownload({
     downloadTotalCount,
     downloadSuccessCount,
     downloadFailedCount,
+    downloadSkippedCount,
     downloadFilter,
     downloadFilteredItems,
     canDownloadBatch,

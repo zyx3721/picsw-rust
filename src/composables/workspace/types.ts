@@ -116,12 +116,12 @@ export type DownloadImageItem = {
   name: string;
   url: string;
   picbed: string;
-  status: 'pending' | 'downloading' | 'success' | 'failed' | 'cancelled';
+  status: 'pending' | 'downloading' | 'success' | 'failed' | 'cancelled' | 'skipped';
   error: string;
   savedPath?: string;
 };
 
-export type DownloadImageFilter = 'all' | 'success' | 'failed';
+export type DownloadImageFilter = 'all' | 'success' | 'failed' | 'skipped';
 
 export type DownloadTaskImage = {
   id: number;

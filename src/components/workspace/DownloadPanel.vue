@@ -17,6 +17,7 @@ const {
   downloadTotalCount,
   downloadSuccessCount,
   downloadFailedCount,
+  downloadSkippedCount,
   downloadFilter,
   downloadFilteredItems,
   canDownloadBatch,
@@ -116,7 +117,7 @@ function confirmClearDocuments() {
         <h2>{{ t('download.imagesTitle') }}</h2>
       </div>
     </div>
-    <div class="local-summary summary-filters" role="group" :aria-label="t('download.filterGroup')">
+    <div class="local-summary summary-filters download-summary" role="group" :aria-label="t('download.filterGroup')">
       <button
         class="summary-filter"
         :class="{ active: downloadFilter === 'all' }"
@@ -144,6 +145,15 @@ function confirmClearDocuments() {
       >
         {{ t('download.failedCount', { count: downloadFailedCount }) }}
       </button>
+      <button
+        class="summary-filter"
+        :class="{ active: downloadFilter === 'skipped' }"
+        type="button"
+        :aria-pressed="downloadFilter === 'skipped'"
+        @click="setDownloadFilter('skipped')"
+      >
+        {{ t('download.skippedCount', { count: downloadSkippedCount }) }}
+      </button>
     </div>
     <div class="batch-list local-image-list">
       <div
@@ -163,7 +173,9 @@ function confirmClearDocuments() {
             <small class="error-tip-text">{{ localizeError(image.error) }}</small>
           </AppTooltip>
         </div>
-        <small>{{ typeLabel(image.picbed) }}</small>
+        <small>
+          {{ typeLabel(image.picbed) }}<template v-if="image.status === 'skipped'"> · {{ t('download.skippedBadge') }}</template>
+        </small>
       </div>
       <p v-if="downloadFilteredItems.length === 0" class="empty">
         {{ downloadItems.length ? t('download.filterEmpty') : t('download.listEmpty') }}

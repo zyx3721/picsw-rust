@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tokio::sync::mpsc;
 
-use crate::commands::download::{unique_target, write_atomically};
+use crate::commands::download::write_atomically;
 use crate::engine::{self, LocalBatchManifest, MarkdownRequest};
 use crate::models::now_string;
 use crate::uploader;
@@ -222,7 +222,7 @@ pub fn prepare_task_resume(conn: &rusqlite::Connection, task_id: i64) -> rusqlit
             rusqlite::params![task_id, now],
         )?;
         conn.execute(
-            "UPDATE download_task_images SET status = 'pending', error = '', updated_at = ?2 WHERE task_id = ?1 AND status != 'success'",
+            "UPDATE download_task_images SET status = 'pending', error = '', updated_at = ?2 WHERE task_id = ?1 AND status NOT IN ('success', 'skipped')",
             rusqlite::params![task_id, now],
         )?;
     } else {
@@ -708,6 +708,7 @@ async fn run_download_task(
     let document_ids = document_ids_for_task(app, task_id);
     let total_documents = payload.documents.len();
     let mut done = (success + partial + failed) as usize;
+    let mut skipped_images = 0i64;
     for (index, _document) in payload.documents.iter().enumerate() {
         let document_id = document_ids.get(index).copied();
         if document_id.is_some_and(|id| completed_documents.contains(&id)) {
@@ -733,13 +734,28 @@ async fn run_download_task(
                 advance_document_progress(app, document_id);
                 continue;
             }
+            if row.status == "skipped" {
+                ok += 1;
+                skipped_images += 1;
+                advance_document_progress(app, document_id);
+                continue;
+            }
             match uploader::download_image(&row.url).await {
                 Ok(image) => {
-                    let path = unique_target(&target, &image.filename);
+                    let file_name = image.filename.trim();
+                    let file_name = if file_name.is_empty() { "image.png" } else { file_name };
+                    let path = target.join(file_name);
+                    if path.exists() {
+                        skipped_images += 1;
+                        update_download_image_skipped(app, row.id, file_name, &path.to_string_lossy());
+                        advance_document_progress(app, document_id);
+                        ok += 1;
+                        continue;
+                    }
                     match write_atomically(&path, &image.data) {
                         Ok(()) => {
                             ok += 1;
-                            update_download_image_success(app, row.id, &image.filename, &path.to_string_lossy());
+                            update_download_image_success(app, row.id, file_name, &path.to_string_lossy());
                             advance_document_progress(app, document_id);
                         }
                         Err(error) => {
@@ -772,7 +788,14 @@ async fn run_download_task(
         });
     }
     let status = if failed > 0 { "failed" } else { "success" };
-    let message = format!("下载完成，成功 {} 个，部分 {} 个，失败 {} 个", success, partial, failed);
+    let message = if skipped_images > 0 {
+        format!(
+            "下载完成，成功 {} 个，部分 {} 个，失败 {} 个，跳过 {} 张已存在图片",
+            success, partial, failed, skipped_images
+        )
+    } else {
+        format!("下载完成，成功 {} 个，部分 {} 个，失败 {} 个", success, partial, failed)
+    };
     let _ = with_db(app, |conn| {
         conn.execute(
             "UPDATE conversion_tasks SET status = ?2, success = ?3, partial = ?4, failed = ?5, message = ?6, error = '', ended_at = ?7, updated_at = ?8 WHERE id = ?1",
@@ -817,6 +840,15 @@ fn update_download_image_success(app: &AppHandle, image_id: i64, file_name: &str
     let _ = with_db(app, |conn| {
         conn.execute(
             "UPDATE download_task_images SET status = 'success', file_name = ?2, saved_path = ?3, error = '', updated_at = ?4 WHERE id = ?1",
+            rusqlite::params![image_id, file_name, saved_path, now_string()],
+        )
+    });
+}
+
+fn update_download_image_skipped(app: &AppHandle, image_id: i64, file_name: &str, saved_path: &str) {
+    let _ = with_db(app, |conn| {
+        conn.execute(
+            "UPDATE download_task_images SET status = 'skipped', file_name = ?2, saved_path = ?3, error = '', updated_at = ?4 WHERE id = ?1",
             rusqlite::params![image_id, file_name, saved_path, now_string()],
         )
     });
