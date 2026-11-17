@@ -339,8 +339,6 @@ export function usePicbedWorkspace() {
   }
   function setActiveTab(tab: WorkspaceTab) {
     if (activeTab.value === 'configs' || tab === 'configs') resetConfigForm();
-    if (activeTab.value === 'convert' || tab === 'convert') resetConvertForm();
-    if (activeTab.value === 'localUpload' || tab === 'localUpload') resetLocalUploadForm();
     activeTab.value = tab;
   }
   async function openRecordDetail(record: ConversionRecord) {
