@@ -403,7 +403,7 @@ export function usePicbedWorkspace() {
     if (taskProgress.taskKind === 'download') markDownloadCancelledState();
     updateTaskProgress({
       documents: taskProgress.documents.map(document =>
-        document.status === 'success' || document.status === 'failed'
+        document.status === 'success' || document.status === 'partial' || document.status === 'failed'
           ? document
           : { ...document, status: 'cancelled' as const, error: '' }
       ),

@@ -217,14 +217,57 @@ pub fn prepare_task_resume(conn: &rusqlite::Connection, task_id: i64) -> rusqlit
         .query_row("SELECT task_type FROM conversion_tasks WHERE id = ?1", [task_id], |row| row.get::<_, String>(0))
         .unwrap_or_default();
     if task_type == "download" {
-        conn.execute(
-            "UPDATE conversion_task_documents SET status = 'queued', processed_images = 0, error = '', updated_at = ?2 WHERE task_id = ?1 AND status != 'success'",
-            rusqlite::params![task_id, now],
-        )?;
-        conn.execute(
-            "UPDATE download_task_images SET status = 'pending', error = '', updated_at = ?2 WHERE task_id = ?1 AND status NOT IN ('success', 'skipped')",
-            rusqlite::params![task_id, now],
-        )?;
+        let document_ids: Vec<i64> = {
+            let mut stmt = conn.prepare("SELECT id FROM conversion_task_documents WHERE task_id = ?1 ORDER BY id ASC")?;
+            let ids = stmt
+                .query_map([task_id], |row| row.get(0))?
+                .filter_map(|row| row.ok())
+                .collect();
+            ids
+        };
+        let mut rows_by_index: HashMap<i64, Vec<String>> = HashMap::new();
+        {
+            let mut stmt = conn.prepare("SELECT document_index, status FROM download_task_images WHERE task_id = ?1")?;
+            let rows = stmt.query_map([task_id], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)))?;
+            for (index, status) in rows.flatten() {
+                rows_by_index.entry(index).or_default().push(status);
+            }
+        }
+        for (index, document_id) in document_ids.iter().enumerate() {
+            let statuses = rows_by_index.get(&(index as i64)).cloned().unwrap_or_default();
+            let has_incomplete = statuses
+                .iter()
+                .any(|status| matches!(status.as_str(), "pending" | "running" | "cancelled"));
+            if has_incomplete {
+                conn.execute(
+                    "UPDATE conversion_task_documents SET status = 'queued', processed_images = 0, error = '', updated_at = ?2 WHERE id = ?1",
+                    rusqlite::params![document_id, now],
+                )?;
+                conn.execute(
+                    "UPDATE download_task_images SET status = 'pending', error = '', updated_at = ?3 WHERE task_id = ?1 AND document_index = ?2 AND status NOT IN ('success', 'skipped')",
+                    rusqlite::params![task_id, index as i64, now],
+                )?;
+                continue;
+            }
+            let current_status: String = conn
+                .query_row("SELECT status FROM conversion_task_documents WHERE id = ?1", [document_id], |row| row.get(0))
+                .unwrap_or_default();
+            if matches!(current_status.as_str(), "success" | "partial" | "failed") {
+                continue;
+            }
+            let total = statuses.len() as i64;
+            let processed = statuses
+                .iter()
+                .filter(|status| matches!(status.as_str(), "success" | "skipped"))
+                .count() as i64;
+            let failed = statuses.iter().filter(|status| status.as_str() == "failed").count() as i64;
+            let status = if failed == 0 { "success" } else if failed == total { "failed" } else { "partial" };
+            let error = if failed > 0 { format!("{} 张图片下载失败", failed) } else { String::new() };
+            conn.execute(
+                "UPDATE conversion_task_documents SET status = ?2, processed_images = ?3, error = ?4, updated_at = ?5 WHERE id = ?1",
+                rusqlite::params![document_id, status, processed, error, now],
+            )?;
+        }
     } else {
         conn.execute(
             "UPDATE conversion_task_documents SET status = 'queued', processed_images = 0, error = '', updated_at = ?2 WHERE task_id = ?1 AND status IN ('queued', 'running', 'interrupted')",
@@ -977,6 +1020,7 @@ mod tests {
         conn.execute_batch(
             "CREATE TABLE conversion_tasks (
                 id INTEGER PRIMARY KEY,
+                task_type TEXT NOT NULL DEFAULT 'convert',
                 status TEXT NOT NULL,
                 total INTEGER NOT NULL,
                 success INTEGER NOT NULL,
@@ -998,7 +1042,9 @@ mod tests {
             CREATE TABLE download_task_images (
                 id INTEGER PRIMARY KEY,
                 task_id INTEGER NOT NULL,
+                document_index INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
+                error TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL
             );",
         )
@@ -1159,5 +1205,80 @@ mod tests {
             statuses,
             vec!["success".to_string(), "partial".to_string(), "cancelled".to_string(), "cancelled".to_string()]
         );
+    }
+
+    fn insert_download_image(conn: &Connection, task_id: i64, document_index: i64, status: &str) {
+        conn.execute(
+            "INSERT INTO download_task_images (task_id, document_index, status, error, updated_at) VALUES (?1, ?2, ?3, '', 'start')",
+            rusqlite::params![task_id, document_index, status],
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn download_resume_keeps_fully_attempted_documents() {
+        let conn = test_connection();
+        insert_task(&conn, 1, "interrupted", 3, 0, 0);
+        conn.execute("UPDATE conversion_tasks SET task_type = 'download' WHERE id = 1", []).unwrap();
+        conn.execute(
+            "INSERT INTO conversion_task_documents (id, task_id, status, processed_images, error, updated_at) VALUES (1, 1, 'partial', 8, '2 张图片下载失败', 'start')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO conversion_task_documents (id, task_id, status, processed_images, error, updated_at) VALUES (2, 1, 'running', 0, '', 'start')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO conversion_task_documents (id, task_id, status, processed_images, error, updated_at) VALUES (3, 1, 'running', 5, '', 'start')",
+            [],
+        )
+        .unwrap();
+        insert_download_image(&conn, 1, 0, "success");
+        insert_download_image(&conn, 1, 0, "failed");
+        insert_download_image(&conn, 1, 1, "success");
+        insert_download_image(&conn, 1, 2, "success");
+        insert_download_image(&conn, 1, 2, "failed");
+        insert_download_image(&conn, 1, 2, "pending");
+
+        prepare_task_resume(&conn, 1).unwrap();
+
+        let (status, success, partial, failed): (String, i64, i64, i64) = conn
+            .query_row(
+                "SELECT status, success, partial, failed FROM conversion_tasks WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "queued");
+        assert_eq!(success, 1);
+        assert_eq!(partial, 1);
+        assert_eq!(failed, 0);
+
+        let documents: Vec<(i64, String, i64)> = conn
+            .prepare("SELECT id, status, processed_images FROM conversion_task_documents ORDER BY id")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .filter_map(|row| row.ok())
+            .collect();
+        assert_eq!(documents[0], (1, "partial".to_string(), 8));
+        assert_eq!(documents[1], (2, "success".to_string(), 1));
+        assert_eq!(documents[2], (3, "queued".to_string(), 0));
+
+        let rows: Vec<(i64, String)> = conn
+            .prepare("SELECT document_index, status FROM download_task_images ORDER BY id")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .filter_map(|row| row.ok())
+            .collect();
+        assert_eq!(rows[0], (0, "success".to_string()));
+        assert_eq!(rows[1], (0, "failed".to_string()));
+        assert_eq!(rows[2], (1, "success".to_string()));
+        assert_eq!(rows[3], (2, "success".to_string()));
+        assert_eq!(rows[4], (2, "pending".to_string()));
+        assert_eq!(rows[5], (2, "pending".to_string()));
     }
 }
