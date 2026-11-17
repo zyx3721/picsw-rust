@@ -3,6 +3,7 @@ import { DownloadCloud, FileSearch, FolderOpen, Trash2, UploadCloud } from 'luci
 import { ref } from 'vue';
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import type { DownloadDocument } from '../../composables/workspace/types';
 import { t } from '../../i18n';
 import { localizeError } from '../../i18n/errorText';
 
@@ -32,6 +33,12 @@ const {
 } = useWorkspaceContext();
 
 const clearConfirmOpen = ref(false);
+
+function remoteImagesLabel(item: DownloadDocument) {
+  const uniqueImages = new Set(item.images.map(image => image.url.trim())).size;
+  const duplicates = Math.max(0, item.images.length - uniqueImages);
+  return `${t('download.remoteImages', { count: item.images.length })}${duplicates > 0 ? t('download.duplicateSuffix', { count: duplicates }) : ''}`;
+}
 
 /// 确认后清空网络图片文档与识别结果
 function confirmClearDocuments() {
@@ -74,7 +81,7 @@ function confirmClearDocuments() {
       <div v-for="item in downloadDocuments" :key="item.id" class="batch-row" :data-status="item.status">
         <div class="row-info">
           <strong>{{ item.filename }}</strong
-          ><span>{{ downloadStatusLabel(item.status) }} · {{ t('download.remoteImages', { count: item.images.length }) }}</span
+          ><span>{{ downloadStatusLabel(item.status) }} · {{ remoteImagesLabel(item) }}</span
           ><AppTooltip v-if="item.error" :label="localizeError(item.error)" wrap>
             <small class="error-tip-text">{{ localizeError(item.error) }}</small>
           </AppTooltip>

@@ -80,6 +80,17 @@ function skippedDetails(item: LocalDocument): ConversionRecordDetail[] {
   return (item.details || []).filter(detail => detail.status === 'skipped');
 }
 
+function referenceSummary(item: LocalDocument) {
+  const uniqueReferences = item.matched + item.missing.length;
+  const duplicates = Math.max(0, item.references.length - uniqueReferences);
+  return t('local.refsMatched', {
+    refs: uniqueReferences,
+    matched: item.matched,
+    missing: item.missing.length,
+    duplicateSuffix: duplicates > 0 ? t('local.duplicateSuffix', { count: duplicates }) : '',
+  });
+}
+
 async function chooseImageDirectory() {
   const images = await scanLocalImageDirectory();
   if (!images) return;
@@ -132,7 +143,7 @@ function confirmScan() {
           <strong>{{ item.filename }}</strong
           ><span
             >{{ localStatusLabel(item.status) }} ·
-            {{ t('local.refsMatched', { refs: item.matched + item.missing.length, matched: item.matched, missing: item.missing.length }) }}</span
+            {{ referenceSummary(item) }}</span
           ><AppTooltip v-if="item.missing.length" :label="t('local.missingList', { list: item.missing.join(t('common.listSeparator')) })" wrap>
             <small class="error-tip-text">{{ t('local.missingList', { list: item.missing.join(t('common.listSeparator')) }) }}</small>
           </AppTooltip>
