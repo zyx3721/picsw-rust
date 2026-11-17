@@ -206,6 +206,20 @@ export function useWorkspaceLocalUpload({
     localImages.value = localImages.value.filter(item => item.key !== key);
     analyzeLocalMatches();
   }
+  function clearLocalDocuments() {
+    const count = localDocuments.value.length;
+    if (!count) return;
+    localDocuments.value = [];
+    persistLocalUploadWorkspace();
+    showMessage(t('msg.local.clearedDocs', { count }));
+  }
+  function clearLocalImages() {
+    const count = localImages.value.length;
+    if (!count) return;
+    localImages.value = [];
+    analyzeLocalMatches();
+    showMessage(t('msg.local.clearedImages', { count }));
+  }
   async function analyzeLocalBatch() {
     if (!localDocuments.value.length) {
       showError(t('msg.local.needDocs'));
@@ -471,6 +485,8 @@ export function useWorkspaceLocalUpload({
     handleLocalImageDrop,
     removeLocalDocument,
     removeLocalImage,
+    clearLocalDocuments,
+    clearLocalImages,
     analyzeLocalBatch,
     uploadLocalBatch,
     restoreLocalUploadWorkspace,

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ChevronDown, Download, FileSearch, ImagePlus, Trash2, UploadCloud, Wand2 } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import { t } from '../../i18n';
@@ -29,11 +30,38 @@ const {
   handleLocalImageDrop,
   removeLocalDocument,
   removeLocalImage,
+  clearLocalDocuments,
+  clearLocalImages,
   analyzeLocalBatch,
   uploadLocalBatch,
   downloadLocalFile,
   downloadAllLocalFiles,
 } = useWorkspaceContext();
+
+type ClearTarget = 'documents' | 'images';
+
+const clearTarget = ref<ClearTarget | null>(null);
+const clearCount = computed(() =>
+  clearTarget.value === 'images' ? localImages.value.length : localDocuments.value.length
+);
+const clearTitle = computed(() =>
+  clearTarget.value === 'images' ? t('local.clearImagesTitle') : t('local.clearDocsTitle')
+);
+const clearDesc = computed(() =>
+  clearTarget.value === 'images'
+    ? t('local.clearImagesDesc', { count: clearCount.value })
+    : t('local.clearDocsDesc', { count: clearCount.value })
+);
+const clearConfirmLabel = computed(() =>
+  clearTarget.value === 'images' ? t('local.clearImagesConfirm') : t('local.clearDocsConfirm')
+);
+
+/// 确认后按当前目标清空文档或本地图片
+function confirmClear() {
+  if (clearTarget.value === 'images') clearLocalImages();
+  else if (clearTarget.value === 'documents') clearLocalDocuments();
+  clearTarget.value = null;
+}
 </script>
 
 <template>
@@ -54,6 +82,12 @@ const {
         ><UploadCloud :size="18" /><span>{{ t('convert.uploadHint') }}</span
         ><input type="file" multiple accept=".md,text/markdown" @change="handleLocalDocumentFiles"
       /></label>
+    </div>
+    <div v-if="localDocuments.length" class="batch-list-head">
+      <span>{{ t('local.docCount', { count: localDocuments.length }) }}</span>
+      <button class="ghost danger-text" type="button" :disabled="loading" @click="clearTarget = 'documents'">
+        <Trash2 :size="15" />{{ t('convert.clearAll') }}
+      </button>
     </div>
     <div class="batch-list local-list">
       <div
@@ -117,6 +151,12 @@ const {
       <span>{{ t('local.imagesCount', { count: localImages.length }) }}</span>
       <span>{{ t('local.matchedCount', { count: localMatchedCount }) }}</span>
       <span>{{ t('local.missingCount', { count: localMissingCount }) }}</span>
+    </div>
+    <div v-if="localImages.length" class="batch-list-head">
+      <span>{{ t('local.imageCountLabel', { count: localImages.length }) }}</span>
+      <button class="ghost danger-text" type="button" :disabled="loading" @click="clearTarget = 'images'">
+        <Trash2 :size="15" />{{ t('convert.clearAll') }}
+      </button>
     </div>
     <div class="batch-list local-image-list">
       <div v-for="image in localImages" :key="image.key" class="batch-row local-image-row" data-status="analyzed">
@@ -195,5 +235,24 @@ const {
       <Download :size="18" />{{ t('common.downloadAll') }}
     </button>
   </div>
+  <Teleport to="body">
+    <div v-if="clearTarget" class="modal-backdrop" role="presentation" @click.self="clearTarget = null">
+      <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-local-title">
+        <div class="dialog-head">
+          <div class="dialog-icon"><Trash2 :size="22" /></div>
+          <h2 id="clear-local-title">{{ clearTitle }}</h2>
+        </div>
+        <div class="dialog-copy">
+          <p>{{ clearDesc }}</p>
+        </div>
+        <div class="dialog-actions">
+          <button class="ghost" type="button" @click="clearTarget = null">{{ t('common.cancel') }}</button>
+          <button class="danger" type="button" @click="confirmClear">
+            <Trash2 :size="17" />{{ clearConfirmLabel }}
+          </button>
+        </div>
+      </section>
+    </div>
+  </Teleport>
 </section>
 </template>
