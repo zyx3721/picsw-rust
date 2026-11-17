@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Ban, CheckCircle2, CircleAlert, LoaderCircle, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
+import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import type { TaskDocumentProgress } from '../../composables/workspace/types';
 import { t } from '../../i18n';
@@ -102,7 +103,9 @@ function documentCountLabel(document: TaskDocumentProgress) {
             :data-status="document.status"
           >
             <div class="task-progress-doc-head">
-              <span class="task-progress-doc-name" :title="document.filename">{{ document.filename }}</span>
+              <AppTooltip class="task-progress-doc-name" :label="document.filename" wrap>
+                <span>{{ document.filename }}</span>
+              </AppTooltip>
               <span class="task-progress-doc-status">{{ documentStatusLabel(document.status) }}</span>
               <span class="task-progress-doc-count">{{ documentCountLabel(document) }}</span>
             </div>

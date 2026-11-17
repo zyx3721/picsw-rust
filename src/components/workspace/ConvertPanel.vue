@@ -128,7 +128,9 @@ function confirmClearQueue() {
         <div v-if="failedDetails(file).length" class="doc-issue-list">
           <p class="doc-issue-title">{{ t('convert.issueFailed') }} · {{ failedDetails(file).length }}</p>
           <div v-for="detail in failedDetails(file).slice(0, 4)" :key="detail.id" class="doc-issue-row">
-            <span class="doc-issue-url" :title="detail.original_url">{{ detail.original_url }}</span>
+            <AppTooltip class="doc-issue-url" :label="detail.original_url" wrap>
+              <span>{{ detail.original_url }}</span>
+            </AppTooltip>
             <AppTooltip v-if="detail.error" :label="localizeError(detail.error)" wrap>
               <span class="doc-issue-error">{{ localizeError(detail.error) }}</span>
             </AppTooltip>
@@ -138,7 +140,9 @@ function confirmClearQueue() {
         <div v-if="skippedDetails(file).length" class="doc-skip-list">
           <p class="doc-skip-title">{{ t('convert.issueSkipped') }} · {{ skippedDetails(file).length }}</p>
           <div v-for="detail in skippedDetails(file).slice(0, 4)" :key="detail.id" class="doc-skip-row">
-            <span class="doc-skip-url" :title="detail.original_url">{{ detail.original_url }}</span>
+            <AppTooltip class="doc-skip-url" :label="detail.original_url" wrap>
+              <span>{{ detail.original_url }}</span>
+            </AppTooltip>
             <span class="doc-skip-reason">{{ t('convert.skipReason') }}</span>
           </div>
           <small v-if="skippedDetails(file).length > 4" class="doc-skip-more">{{ t('convert.skipMore', { count: skippedDetails(file).length - 4 }) }}</small>

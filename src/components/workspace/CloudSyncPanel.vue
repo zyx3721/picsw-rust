@@ -308,19 +308,17 @@ function submitUnlock() {
           <span>{{ t('sync.autoHint') }}</span>
         </div>
       </div>
-      <label
-        class="sync-toggle"
-        :title="autoSyncToggleTitle"
-        :class="{ disabled: !autoSyncToggleEnabled }"
-      >
-        <input
-          type="checkbox"
-          :checked="autoSyncDisplayChecked"
-          :disabled="!autoSyncToggleEnabled"
-          @change="setAutoSyncEnabled(($event.target as HTMLInputElement).checked)"
-        />
-        <span class="sync-toggle-track" aria-hidden="true"></span>
-      </label>
+      <AppTooltip class="sync-toggle-tooltip" :label="autoSyncToggleTitle" center>
+        <label class="sync-toggle" :class="{ disabled: !autoSyncToggleEnabled }">
+          <input
+            type="checkbox"
+            :checked="autoSyncDisplayChecked"
+            :disabled="!autoSyncToggleEnabled"
+            @change="setAutoSyncEnabled(($event.target as HTMLInputElement).checked)"
+          />
+          <span class="sync-toggle-track" aria-hidden="true"></span>
+        </label>
+      </AppTooltip>
     </div>
 
     <div class="sync-row">

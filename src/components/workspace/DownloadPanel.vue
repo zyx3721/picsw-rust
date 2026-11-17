@@ -186,9 +186,11 @@ function confirmClearDocuments() {
             type="text"
             :placeholder="t('download.dirPlaceholder')"
             spellcheck="false"
-          /><button class="ghost icon-only" type="button" :title="t('common.chooseDir')" @click="selectDownloadDir">
-            <FolderOpen :size="17" />
-          </button>
+          /><AppTooltip class="download-dir-tooltip" :label="t('common.chooseDir')" center>
+            <button class="ghost icon-only" type="button" :aria-label="t('common.chooseDir')" @click="selectDownloadDir">
+              <FolderOpen :size="17" />
+            </button>
+          </AppTooltip>
         </div>
       </label>
       <div class="actions compact-actions">
