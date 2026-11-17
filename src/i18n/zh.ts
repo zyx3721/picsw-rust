@@ -428,6 +428,8 @@ export const zh = {
   'convert.issueFailed': '问题图片',
   'convert.issueSkipped': '已跳过的同图床图片',
   'convert.issueMore': '还有 {count} 张问题图片',
+  'convert.skipReason': '已是目标图床，无需重复上传',
+  'convert.skipMore': '还有 {count} 张已跳过的图片',
   'msg.convert.progressTitle': '批量转换处理中',
   'msg.convert.progressRestoring': '正在恢复后台任务进度',
   'msg.convert.progressRestored': '已恢复 {count} 个文档，任务会继续同步进度',

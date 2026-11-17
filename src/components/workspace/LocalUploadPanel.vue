@@ -71,6 +71,10 @@ function confirmClear() {
 function failedDetails(item: LocalDocument): ConversionRecordDetail[] {
   return (item.details || []).filter(detail => detail.status === 'failed');
 }
+
+function skippedDetails(item: LocalDocument): ConversionRecordDetail[] {
+  return (item.details || []).filter(detail => detail.status === 'skipped');
+}
 </script>
 
 <template>
@@ -138,6 +142,14 @@ function failedDetails(item: LocalDocument): ConversionRecordDetail[] {
             </AppTooltip>
           </div>
           <small v-if="failedDetails(item).length > 4" class="doc-issue-more">{{ t('convert.issueMore', { count: failedDetails(item).length - 4 }) }}</small>
+        </div>
+        <div v-if="skippedDetails(item).length" class="doc-skip-list">
+          <p class="doc-skip-title">{{ t('convert.issueSkipped') }} · {{ skippedDetails(item).length }}</p>
+          <div v-for="detail in skippedDetails(item).slice(0, 4)" :key="detail.id" class="doc-skip-row">
+            <span class="doc-skip-url" :title="detail.original_url">{{ detail.original_url }}</span>
+            <span class="doc-skip-reason">{{ t('convert.skipReason') }}</span>
+          </div>
+          <small v-if="skippedDetails(item).length > 4" class="doc-skip-more">{{ t('convert.skipMore', { count: skippedDetails(item).length - 4 }) }}</small>
         </div>
       </div>
       <p v-if="localDocuments.length === 0" class="empty">{{ t('local.docEmpty') }}</p>

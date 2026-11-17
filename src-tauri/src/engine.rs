@@ -182,15 +182,30 @@ pub async fn convert_one(
         return Err(err);
     }
     let source_picbed = summarize_source_pic_beds(&images);
+    let mut picbed_by_url: HashMap<String, String> = HashMap::new();
+    for image in &images {
+        picbed_by_url
+            .entry(image.url.trim().to_string())
+            .or_insert_with(|| image.picbed.clone());
+    }
 
     let unique_urls = collect_unique_urls(&images);
     let total_images = unique_urls.len();
     let mut resolved: HashMap<String, PendingImage> = HashMap::new();
     let mut details: Vec<ConversionRecordDetail> = Vec::new();
     let mut failed_images = 0usize;
+    let mut skipped_images = 0usize;
     for image_url in unique_urls {
         if state.is_task_cancelled(task_id) {
             return Err(TASK_CANCELLED.to_string());
+        }
+        let image_picbed = picbed_by_url.get(&image_url).map(|value| value.as_str()).unwrap_or("");
+        if is_same_picbed(image_picbed, &target.picbed_type) {
+            resolved.insert(image_url.clone(), PendingImage::Keep);
+            skipped_images += 1;
+            details.push(skipped_detail(&image_url));
+            advance_document_progress(state, document_id);
+            continue;
         }
         if !is_http_image_url(&image_url) {
             let message = "本地路径无法通过批量转换上传".to_string();
@@ -260,7 +275,7 @@ pub async fn convert_one(
         "content": output,
         "changed": changed,
         "failed": failed_images,
-        "skipped": 0,
+        "skipped": skipped_images,
         "status": status,
         "record": record_value,
     }))
@@ -308,6 +323,7 @@ pub async fn convert_local_one(
     let mut resolved: HashMap<String, PendingImage> = HashMap::new();
     let mut details: Vec<ConversionRecordDetail> = Vec::new();
     let mut failed_images = 0usize;
+    let skipped_images = 0usize;
     for image_url in unique_urls {
         if state.is_task_cancelled(task_id) {
             return Err(TASK_CANCELLED.to_string());
@@ -412,7 +428,7 @@ pub async fn convert_local_one(
         "content": output,
         "changed": changed,
         "failed": failed_images,
-        "skipped": 0,
+        "skipped": skipped_images,
         "status": status,
         "record": record_value,
     }))
@@ -483,6 +499,22 @@ fn failed_detail(original_url: &str, error: &str) -> ConversionRecordDetail {
         error: Some(error.to_string()),
         created_at: String::new(),
     }
+}
+
+fn skipped_detail(original_url: &str) -> ConversionRecordDetail {
+    ConversionRecordDetail {
+        id: 0,
+        record_id: 0,
+        original_url: original_url.to_string(),
+        target_url: original_url.to_string(),
+        status: "skipped".to_string(),
+        error: None,
+        created_at: String::new(),
+    }
+}
+
+fn is_same_picbed(image_picbed: &str, target_picbed: &str) -> bool {
+    !image_picbed.is_empty() && image_picbed != "other" && image_picbed == target_picbed
 }
 
 fn write_failed_record(
@@ -624,5 +656,19 @@ pub fn load_record_details(conn: &rusqlite::Connection, record_id: i64) -> Vec<C
     match rows {
         Ok(rows) => rows.filter_map(|row| row.ok()).collect(),
         Err(_) => Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_same_picbed;
+
+    #[test]
+    fn skips_only_known_same_host() {
+        assert!(is_same_picbed("github", "github"));
+        assert!(is_same_picbed("gitee", "gitee"));
+        assert!(!is_same_picbed("gitee", "github"));
+        assert!(!is_same_picbed("other", "other"));
+        assert!(!is_same_picbed("", "github"));
     }
 }

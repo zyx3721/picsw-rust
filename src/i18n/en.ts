@@ -430,6 +430,8 @@ export const en: Record<keyof typeof zh, string> = {
   'convert.issueFailed': 'Images with errors',
   'convert.issueSkipped': 'Images already on the target host',
   'convert.issueMore': '{count} more images with errors',
+  'convert.skipReason': 'Already on the target host; no upload needed',
+  'convert.skipMore': '{count} more skipped images',
   'msg.convert.progressTitle': 'Batch Conversion in Progress',
   'msg.convert.progressRestoring': 'Restoring background task progress',
   'msg.convert.progressRestored': '{count} documents restored; the task keeps syncing progress.',

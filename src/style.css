@@ -2027,6 +2027,43 @@ svg {
   color: var(--danger);
   font-size: 11px;
 }
+.doc-skip-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #a9efe6;
+  border-radius: 8px;
+  background: var(--primary-soft);
+}
+.doc-skip-title {
+  margin: 0;
+  color: var(--primary-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+.doc-skip-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 8px;
+  font-size: 11.5px;
+}
+.doc-skip-url,
+.doc-skip-reason {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-skip-url {
+  color: var(--muted);
+}
+.doc-skip-reason {
+  color: var(--primary-strong);
+}
+.doc-skip-more {
+  color: var(--primary-strong);
+  font-size: 11px;
+}
 .diff-row {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
@@ -3511,6 +3548,9 @@ html.dark .preview-diff {
 }
 html.dark .doc-issue-list {
   border-color: rgba(248, 113, 113, 0.35);
+}
+html.dark .doc-skip-list {
+  border-color: rgba(45, 212, 191, 0.35);
 }
 html.dark table {
   background: var(--surface);

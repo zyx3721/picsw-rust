@@ -41,6 +41,10 @@ function failedDetails(file: BatchFile): ConversionRecordDetail[] {
   return (file.details || []).filter(detail => detail.status === 'failed');
 }
 
+function skippedDetails(file: BatchFile): ConversionRecordDetail[] {
+  return (file.details || []).filter(detail => detail.status === 'skipped');
+}
+
 /// 确认后清空队列并关闭弹窗
 function confirmClearQueue() {
   clearConfirmOpen.value = false;
@@ -130,6 +134,14 @@ function confirmClearQueue() {
             </AppTooltip>
           </div>
           <small v-if="failedDetails(file).length > 4" class="doc-issue-more">{{ t('convert.issueMore', { count: failedDetails(file).length - 4 }) }}</small>
+        </div>
+        <div v-if="skippedDetails(file).length" class="doc-skip-list">
+          <p class="doc-skip-title">{{ t('convert.issueSkipped') }} · {{ skippedDetails(file).length }}</p>
+          <div v-for="detail in skippedDetails(file).slice(0, 4)" :key="detail.id" class="doc-skip-row">
+            <span class="doc-skip-url" :title="detail.original_url">{{ detail.original_url }}</span>
+            <span class="doc-skip-reason">{{ t('convert.skipReason') }}</span>
+          </div>
+          <small v-if="skippedDetails(file).length > 4" class="doc-skip-more">{{ t('convert.skipMore', { count: skippedDetails(file).length - 4 }) }}</small>
         </div>
         <div v-if="file.previewOpen" class="preview-diff">
           <div v-for="row in changedLines(file)" :key="row.line" class="diff-row">
