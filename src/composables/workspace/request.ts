@@ -3,7 +3,7 @@ import type { RequestError } from './types';
 import { t } from '../../i18n';
 import { localizeError } from '../../i18n/errorText';
 
-type LocalImageUpload = { key: string; name: string; data: string };
+type LocalImageUpload = { key: string; name: string; data: string; source_path?: string };
 
 /// 更新下载等需要流式回调的路由：经 options.channel 透传 Tauri Channel
 type RequestWithChannel = RequestInit & { channel?: unknown };
@@ -44,10 +44,27 @@ function readFileAsBase64(file: File) {
 async function invokeLocalConvertTask<T>(formData: FormData): Promise<T> {
   const manifestRaw = formData.get('manifest');
   if (typeof manifestRaw !== 'string') throw new Error(t('msg.localManifestInvalid'));
-  const manifest = JSON.parse(manifestRaw);
+  let manifest: unknown;
+  try {
+    manifest = JSON.parse(manifestRaw);
+  } catch {
+    throw new Error(t('msg.localManifestInvalid'));
+  }
   const images: LocalImageUpload[] = [];
+  const pathImagesRaw = formData.get('path_images');
+  if (typeof pathImagesRaw === 'string') {
+    try {
+      const pathImages = JSON.parse(pathImagesRaw) as Array<{ key: string; name: string; source_path: string }>;
+      for (const image of pathImages) {
+        if (!image.key || !image.source_path) continue;
+        images.push({ key: image.key, name: image.name, data: '', source_path: image.source_path });
+      }
+    } catch {
+      throw new Error(t('msg.localManifestInvalid'));
+    }
+  }
   for (const [key, value] of formData.entries()) {
-    if (key === 'manifest' || !(value instanceof File)) continue;
+    if (key === 'manifest' || key === 'path_images' || !(value instanceof File)) continue;
     images.push({ key, name: value.name, data: await readFileAsBase64(value) });
   }
   return invoke<T>('create_local_convert_task', { manifest, images });
@@ -73,6 +90,8 @@ export function createWorkspaceRequest() {
           return await invoke<T>('test_config_draft', { req: body });
         case 'POST /api/files/write':
           return await invoke<T>('write_text_file', { path: body.path || '', content: body.content || '' });
+        case 'POST /api/local/scan-images':
+          return await invoke<T>('scan_image_directory', { path: body.path || '' });
         case 'GET /api/convert/records':
           return await invoke<T>('list_records');
         case 'GET /api/sync/github-client-id':

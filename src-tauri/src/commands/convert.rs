@@ -26,6 +26,8 @@ pub struct LocalImageUpload {
     pub name: String,
     #[serde(default)]
     pub data: String,
+    #[serde(default)]
+    pub source_path: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -113,7 +115,19 @@ pub async fn create_local_convert_task(
     if manifest.documents.len() > 20 {
         return Err("单次最多处理 20 个 Markdown 文档".to_string());
     }
-    let total_bytes: usize = images.iter().map(|image| image.data.len()).sum();
+    let total_bytes: usize = images
+        .iter()
+        .map(|image| {
+            let source_path = image.source_path.trim();
+            if source_path.is_empty() {
+                image.data.len()
+            } else {
+                std::fs::metadata(source_path)
+                    .map(|metadata| metadata.len() as usize)
+                    .unwrap_or(0)
+            }
+        })
+        .sum();
     if total_bytes > MAX_LOCAL_BATCH_BYTES {
         return Err("本地图片总大小不能超过 256MB".to_string());
     }
@@ -445,11 +459,17 @@ fn store_local_task_files(task_dir: &std::path::Path, images: &[LocalImageUpload
         if key.is_empty() {
             continue;
         }
+        let filename = format!("{}-{}", safe_local_task_name(key), safe_local_task_name(&image.name));
+        let path = task_dir.join(filename);
+        let source_path = image.source_path.trim();
+        if !source_path.is_empty() {
+            std::fs::copy(source_path, &path)
+                .map_err(|error| format!("读取本地图片 {} 失败：{}", image.name, error))?;
+            continue;
+        }
         let data = BASE64
             .decode(image.data.as_bytes())
             .map_err(|_| format!("本地图片 {} 解码失败", image.name))?;
-        let filename = format!("{}-{}", safe_local_task_name(key), safe_local_task_name(&image.name));
-        let path = task_dir.join(filename);
         std::fs::write(&path, data).map_err(|e| e.to_string())?;
     }
     Ok(())

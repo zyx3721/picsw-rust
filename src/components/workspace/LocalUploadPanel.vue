@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ChevronDown, Download, FileSearch, ImagePlus, Trash2, UploadCloud, Wand2 } from 'lucide-vue-next';
+import { ChevronDown, Download, FileSearch, FolderOpen, ImagePlus, Trash2, UploadCloud, Wand2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
-import type { ConversionRecordDetail, LocalDocument } from '../../composables/workspace/types';
+import type { ConversionRecordDetail, LocalDocument, ScannedLocalImage } from '../../composables/workspace/types';
 import { t } from '../../i18n';
 import { localizeError } from '../../i18n/errorText';
 
 const {
   loading,
+  showMessage,
   localTargetConfigId,
   localTargetDropdownOpen,
   localDocumentDragActive,
@@ -33,6 +34,8 @@ const {
   handleLocalDocumentDrop,
   handleLocalImageFiles,
   handleLocalImageDrop,
+  scanLocalImageDirectory,
+  addScannedLocalImages,
   removeLocalDocument,
   removeLocalImage,
   clearLocalDocuments,
@@ -46,6 +49,7 @@ const {
 type ClearTarget = 'documents' | 'images';
 
 const clearTarget = ref<ClearTarget | null>(null);
+const pendingScan = ref<ScannedLocalImage[] | null>(null);
 const clearCount = computed(() =>
   clearTarget.value === 'images' ? localImages.value.length : localDocuments.value.length
 );
@@ -74,6 +78,21 @@ function failedDetails(item: LocalDocument): ConversionRecordDetail[] {
 
 function skippedDetails(item: LocalDocument): ConversionRecordDetail[] {
   return (item.details || []).filter(detail => detail.status === 'skipped');
+}
+
+async function chooseImageDirectory() {
+  const images = await scanLocalImageDirectory();
+  if (!images) return;
+  if (!images.length) {
+    showMessage(t('msg.local.scanEmpty'));
+    return;
+  }
+  pendingScan.value = images;
+}
+
+function confirmScan() {
+  if (pendingScan.value) addScannedLocalImages(pendingScan.value);
+  pendingScan.value = null;
 }
 </script>
 
@@ -172,10 +191,9 @@ function skippedDetails(item: LocalDocument): ConversionRecordDetail[] {
           ><ImagePlus :size="18" /><span>{{ t('local.uploadImages') }}</span
           ><input type="file" multiple accept="image/*" @change="handleLocalImageFiles"
         /></label>
-        <label class="upload-control">
-          <ImagePlus :size="18" /><span>{{ t('common.chooseDir') }}</span
-          ><input type="file" multiple webkitdirectory @change="handleLocalImageFiles"
-        /></label>
+        <button class="upload-control" type="button" :disabled="loading" @click="chooseImageDirectory">
+          <FolderOpen :size="18" /><span>{{ t('common.chooseDir') }}</span>
+        </button>
       </div>
     </div>
     <div class="local-summary summary-filters" role="group" :aria-label="t('local.filterGroup')">
@@ -315,6 +333,23 @@ function skippedDetails(item: LocalDocument): ConversionRecordDetail[] {
           <button class="ghost" type="button" @click="clearTarget = null">{{ t('common.cancel') }}</button>
           <button class="danger" type="button" @click="confirmClear">
             <Trash2 :size="17" />{{ clearConfirmLabel }}
+          </button>
+        </div>
+      </section>
+    </div>
+    <div v-if="pendingScan" class="modal-backdrop" role="presentation" @click.self="pendingScan = null">
+      <section class="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="scan-local-title">
+        <div class="dialog-head">
+          <div class="dialog-icon"><FolderOpen :size="22" /></div>
+          <h2 id="scan-local-title">{{ t('local.scanTitle') }}</h2>
+        </div>
+        <div class="dialog-copy">
+          <p>{{ t('local.scanDesc', { count: pendingScan.length }) }}</p>
+        </div>
+        <div class="dialog-actions">
+          <button class="ghost" type="button" @click="pendingScan = null">{{ t('common.cancel') }}</button>
+          <button class="primary" type="button" @click="confirmScan">
+            <ImagePlus :size="17" />{{ t('local.scanConfirm') }}
           </button>
         </div>
       </section>

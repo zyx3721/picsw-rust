@@ -9,6 +9,7 @@ import type {
   LocalImageFilter,
   MarkdownImage,
   PicbedConfig,
+  ScannedLocalImage,
   TaskDocumentProgress,
   TaskKind,
   TaskProgressStatus,
@@ -241,6 +242,46 @@ export function useWorkspaceLocalUpload({
     localImageDragActive.value = false;
     addLocalImages(event.dataTransfer?.files || []);
   }
+  async function scanLocalImageDirectory(): Promise<ScannedLocalImage[] | null> {
+    const dir = await open({ directory: true, multiple: false });
+    if (typeof dir !== 'string' || !dir) return null;
+    loading.value = true;
+    try {
+      const data = await request<{ images: Array<{ name: string; path: string; relative_path: string }>; truncated?: boolean }>(
+        '/api/local/scan-images',
+        { method: 'POST', body: JSON.stringify({ path: dir }) }
+      );
+      if (data.truncated) showMessage(t('msg.local.scanTruncated'));
+      return (data.images || []).map(image => ({
+        name: image.name,
+        path: image.path,
+        relativePath: image.relative_path || image.name,
+      }));
+    } catch (error) {
+      showError(error instanceof Error ? error.message : t('msg.local.scanFailed'));
+      return null;
+    } finally {
+      loading.value = false;
+    }
+  }
+  function addScannedLocalImages(images: ScannedLocalImage[]) {
+    const existing = new Set(localImages.value.map(image => image.sourcePath || image.path));
+    const added = images
+      .filter(image => !existing.has(image.path))
+      .map(image => ({
+        key: `image_${createClientId()}`,
+        name: image.name,
+        path: image.relativePath,
+        sourcePath: image.path,
+      }));
+    if (!added.length) {
+      showMessage(t('msg.local.scanEmpty'));
+      return;
+    }
+    localImages.value = [...localImages.value, ...added];
+    analyzeLocalMatches();
+    showMessage(t('msg.local.addedImages', { count: added.length }));
+  }
   function removeLocalDocument(id: string) {
     localDocuments.value = localDocuments.value.filter(item => item.id !== id);
     persistLocalUploadWorkspace();
@@ -400,7 +441,13 @@ export function useWorkspaceLocalUpload({
       const manifest = buildLocalTaskManifest();
       const formData = new FormData();
       formData.append('manifest', JSON.stringify({ target_config_id: localTargetConfigId.value, documents: manifest.documents }));
-      for (const image of manifest.images) formData.append(image.key, image.file, image.name);
+      const pathImages = manifest.images
+        .filter(image => !image.file && image.sourcePath)
+        .map(image => ({ key: image.key, name: image.name, source_path: image.sourcePath }));
+      for (const image of manifest.images) {
+        if (image.file) formData.append(image.key, image.file, image.name);
+      }
+      if (pathImages.length) formData.append('path_images', JSON.stringify(pathImages));
       const created = await request<{ task: ConversionTask }>('/api/convert/local-tasks', {
         method: 'POST',
         body: formData,
@@ -621,6 +668,8 @@ export function useWorkspaceLocalUpload({
     handleLocalDocumentDrop,
     handleLocalImageFiles,
     handleLocalImageDrop,
+    scanLocalImageDirectory,
+    addScannedLocalImages,
     removeLocalDocument,
     removeLocalImage,
     clearLocalDocuments,

@@ -89,7 +89,14 @@ export type LocalImageFile = {
   key: string;
   name: string;
   path: string;
-  file: File;
+  file?: File;
+  sourcePath?: string;
+};
+
+export type ScannedLocalImage = {
+  name: string;
+  path: string;
+  relativePath: string;
 };
 
 export type LocalImageFilter = 'all' | 'matched' | 'missing';

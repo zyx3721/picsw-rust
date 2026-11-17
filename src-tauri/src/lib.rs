@@ -141,6 +141,7 @@ pub fn run() {
             commands::convert::get_record,
             commands::convert::delete_records,
             commands::files::write_text_file,
+            commands::files::scan_image_directory,
             commands::download::create_download_task,
             commands::sync::sync_save_credential,
             commands::sync::sync_load_credential,
