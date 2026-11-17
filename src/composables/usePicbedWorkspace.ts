@@ -186,6 +186,9 @@ export function usePicbedWorkspace() {
     showMessage,
     showError,
     loading,
+    startTaskProgress,
+    updateTaskProgress,
+    finishTaskProgress,
   });
   const { loadWorkspaceData, loadConfigs, loadRecords } = useWorkspaceData({
     request,

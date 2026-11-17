@@ -443,6 +443,12 @@ export const en: Record<keyof typeof zh, string> = {
   'msg.download.donePartial': 'Download finished: {success} images succeeded, {failed} failed',
   'msg.download.failed': 'Image download failed',
   'msg.download.cleared': 'Removed {count} documents',
+  'msg.download.progressTitle': 'Downloading Remote Images',
+  'msg.download.creating': 'Preparing download',
+  'msg.download.progressDetail': '{documents} documents, {images} images',
+  'msg.download.taskRunning': 'Download task running',
+  'msg.download.taskFailed': 'Download task failed',
+  'msg.download.taskDoneHint': 'You can close this window and check the results in the list',
 
   'msg.config.updated': 'Config updated',
   'msg.config.saved': 'Config saved',

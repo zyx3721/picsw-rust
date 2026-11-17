@@ -1,7 +1,16 @@
 import { computed, ref, watch, type Ref } from 'vue';
 import { open } from '@tauri-apps/plugin-dialog';
+import { Channel } from '@tauri-apps/api/core';
 import { createClientId } from './api';
-import type { DownloadDocument, DownloadImageFilter, DownloadImageItem, DownloadImageResult, MarkdownImage } from './types';
+import type {
+  DownloadDocument,
+  DownloadImageFilter,
+  DownloadImageItem,
+  DownloadImageResult,
+  DownloadProgressEvent,
+  MarkdownImage,
+  TaskDocumentProgress,
+} from './types';
 import { t } from '../../i18n';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
@@ -13,6 +22,16 @@ type DownloadWorkspaceDeps = {
   showMessage: (text: string) => void;
   showError: (text: string) => void;
   loading: Ref<boolean>;
+  startTaskProgress: (input: { title: string; message: string; total: number; detail?: string }) => void;
+  updateTaskProgress: (input: {
+    message?: string;
+    detail?: string;
+    current?: number;
+    success?: number;
+    failed?: number;
+    documents?: TaskDocumentProgress[];
+  }) => void;
+  finishTaskProgress: (input: { status: 'success' | 'failed'; message: string; detail?: string }) => void;
 };
 
 function decodeURIComponentSafe(value: string) {
@@ -29,7 +48,15 @@ function urlFileName(url: string) {
   return decodeURIComponentSafe(last);
 }
 
-export function useWorkspaceDownload({ request, showMessage, showError, loading }: DownloadWorkspaceDeps) {
+export function useWorkspaceDownload({
+  request,
+  showMessage,
+  showError,
+  loading,
+  startTaskProgress,
+  updateTaskProgress,
+  finishTaskProgress,
+}: DownloadWorkspaceDeps) {
   const downloadDocuments = ref<DownloadDocument[]>([]);
   const downloadDragActive = ref(false);
   const downloadItems = ref<DownloadImageItem[]>([]);
@@ -167,21 +194,69 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
 
   async function downloadAllImages() {
     if (!canDownloadBatch.value) return;
-    const urls = downloadItems.value.map(item => item.url);
+    const groups = downloadDocuments.value
+      .map(document => ({
+        document,
+        urls: downloadItems.value.filter(item => item.docId === document.id).map(item => item.url),
+      }))
+      .filter(group => group.urls.length > 0);
+    const totalImages = groups.reduce((sum, group) => sum + group.urls.length, 0);
+    const progressDocuments: TaskDocumentProgress[] = groups.map((group, index) => ({
+      id: index + 1,
+      filename: group.document.filename,
+      total_images: group.urls.length,
+      processed_images: 0,
+      status: 'queued',
+      error: '',
+    }));
     downloadFilter.value = 'all';
     downloadItems.value.forEach(item => {
       item.status = 'downloading';
       item.error = '';
     });
     downloadActive.value = true;
+    startTaskProgress({
+      title: t('msg.download.progressTitle'),
+      message: t('msg.download.creating'),
+      detail: t('msg.download.progressDetail', { documents: groups.length, images: totalImages }),
+      total: groups.length,
+    });
+    updateTaskProgress({ documents: progressDocuments.map(document => ({ ...document })) });
     try {
+      const channel = new Channel<DownloadProgressEvent>();
+      channel.onmessage = progress => {
+        const document = progressDocuments[progress.document_index];
+        if (!document) return;
+        document.processed_images = progress.processed;
+        document.total_images = progress.total;
+        document.status = progress.status;
+        document.error = progress.error;
+        const success = progressDocuments.filter(item => item.status === 'success').length;
+        const failed = progressDocuments.filter(item => item.status === 'failed').length;
+        updateTaskProgress({
+          message: t('msg.download.taskRunning'),
+          current: success + failed,
+          success,
+          failed,
+          documents: progressDocuments.map(item => ({ ...item })),
+        });
+      };
       const results = await request<DownloadImageResult[]>('/api/download/images', {
         method: 'POST',
-        body: JSON.stringify({ urls, target_dir: downloadTargetDir.value.trim() }),
-      });
-      results.forEach((result, index) => {
-        const item = downloadItems.value[index];
-        if (!item) return;
+        body: JSON.stringify({
+          documents: groups.map(group => ({ filename: group.document.filename, urls: group.urls })),
+          target_dir: downloadTargetDir.value.trim(),
+        }),
+        channel,
+      } as RequestInit);
+      const resultsByUrl = new Map(results.map(result => [result.url, result]));
+      downloadItems.value.forEach(item => {
+        const result = resultsByUrl.get(item.url);
+        if (!result) {
+          item.status = 'failed';
+          item.error = t('msg.download.failed');
+          return;
+        }
         item.status = result.status === 'success' ? 'success' : 'failed';
         item.error = result.error || '';
         item.savedPath = result.saved_path || '';
@@ -190,13 +265,20 @@ export function useWorkspaceDownload({ request, showMessage, showError, loading 
       const message = failed === 0
         ? t('msg.download.done', { success: results.length, dir: downloadTargetDir.value.trim() })
         : t('msg.download.donePartial', { success: results.length - failed, failed });
+      finishTaskProgress({
+        status: failed === 0 ? 'success' : 'failed',
+        message,
+        detail: t('msg.download.taskDoneHint'),
+      });
       if (failed === 0) showMessage(message);
       else showError(message);
     } catch (error) {
       downloadItems.value.forEach(item => {
         if (item.status === 'downloading') item.status = 'failed';
       });
-      showError(error instanceof Error ? error.message : t('msg.download.failed'));
+      const message = error instanceof Error ? error.message : t('msg.download.failed');
+      finishTaskProgress({ status: 'failed', message: t('msg.download.taskFailed'), detail: message });
+      showError(message);
     } finally {
       downloadActive.value = false;
     }

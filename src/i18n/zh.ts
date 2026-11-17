@@ -441,6 +441,12 @@ export const zh = {
   'msg.download.donePartial': '下载完成：成功 {success} 张，失败 {failed} 张',
   'msg.download.failed': '下载图片失败',
   'msg.download.cleared': '已移除 {count} 个文档',
+  'msg.download.progressTitle': '正在下载网络图片',
+  'msg.download.creating': '正在准备下载任务',
+  'msg.download.progressDetail': '共 {documents} 个文档，{images} 张图片',
+  'msg.download.taskRunning': '下载任务执行中',
+  'msg.download.taskFailed': '下载任务失败',
+  'msg.download.taskDoneHint': '可以关闭此窗口并在列表查看下载结果',
 
   'msg.config.updated': '配置已更新',
   'msg.config.saved': '配置已保存',

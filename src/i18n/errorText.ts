@@ -181,6 +181,7 @@ const RULES: TranslationRule[] = [
   { pattern: /^下载目录不能为空$/, replacement: 'Choose a download directory' },
   { pattern: /^下载目录不存在，请重新选择$/, replacement: 'The download directory does not exist; choose it again' },
   { pattern: /^没有可下载的图片地址$/, replacement: 'No image URLs to download' },
+  { pattern: /^(\d+) 张图片下载失败$/, replacement: '$1 images failed to download' },
   { pattern: /^写入文件失败：/, replacement: 'Failed to write the file: ' },
   { pattern: /^保存路径不能为空$/, replacement: 'The save path is required' },
   { pattern: /^保存转换记录失败$/, replacement: 'Failed to save the conversion record' },

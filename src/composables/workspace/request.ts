@@ -102,7 +102,11 @@ export function createWorkspaceRequest() {
         case 'POST /api/convert/tasks':
           return await invoke<T>('create_convert_task', { req: body });
         case 'POST /api/download/images':
-          return await invoke<T>('download_remote_images', { urls: body.urls || [], targetDir: body.target_dir || '' });
+          return await invoke<T>('download_remote_images', {
+            documents: body.documents || [],
+            targetDir: body.target_dir || '',
+            onProgress: (options as RequestWithChannel).channel,
+          });
         case 'GET /api/app/update-runtime':
           return await invoke<T>('get_update_runtime');
         case 'GET /api/app/update-latest':

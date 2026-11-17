@@ -119,6 +119,15 @@ export type DownloadImageResult = {
   error: string;
 };
 
+export type DownloadProgressEvent = {
+  document_index: number;
+  filename: string;
+  processed: number;
+  total: number;
+  status: 'running' | 'success' | 'failed';
+  error: string;
+};
+
 export type RemoteConfigPreview = {
   picbed_type: string;
   config_name: string;
