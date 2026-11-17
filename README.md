@@ -297,6 +297,7 @@ picsw-rust/
 | v1.2.6 | 2026-11-16 | [verchanglog/v1.2.6.md](verchanglog/v1.2.6.md) |
 | v1.2.7 | 2026-11-16 | [verchanglog/v1.2.7.md](verchanglog/v1.2.7.md) |
 | v1.3.0 | 2026-11-16 | [verchanglog/v1.3.0.md](verchanglog/v1.3.0.md) |
+| v1.4.0 | 2026-11-17 | [verchanglog/v1.4.0.md](verchanglog/v1.4.0.md) |
 
 各版本的构建产物与发布说明见 [GitHub Releases](https://github.com/zyx3721/picsw-rust/releases)。
 
