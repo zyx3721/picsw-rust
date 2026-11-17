@@ -132,7 +132,7 @@ function confirmScan() {
           <strong>{{ item.filename }}</strong
           ><span
             >{{ localStatusLabel(item.status) }} ·
-            {{ t('local.refsMatched', { refs: item.references.length, matched: item.matched }) }}</span
+            {{ t('local.refsMatched', { refs: item.matched + item.missing.length, matched: item.matched, missing: item.missing.length }) }}</span
           ><AppTooltip v-if="item.missing.length" :label="t('local.missingList', { list: item.missing.join(t('common.listSeparator')) })" wrap>
             <small class="error-tip-text">{{ t('local.missingList', { list: item.missing.join(t('common.listSeparator')) }) }}</small>
           </AppTooltip>

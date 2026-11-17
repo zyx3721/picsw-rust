@@ -97,8 +97,6 @@ export function useWorkspaceLocalUpload({
   const selectedLocalTargetConfig = computed(() =>
     localTargetConfigs.value.find(item => item.id === localTargetConfigId.value)
   );
-  const localMatchedCount = computed(() => localDocuments.value.reduce((sum, item) => sum + item.matched, 0));
-  const localMissingCount = computed(() => localDocuments.value.reduce((sum, item) => sum + item.missing.length, 0));
   const localMatchedImages = computed(() => {
     const matchedKeys = new Set<string>();
     for (const document of localDocuments.value) {
@@ -118,6 +116,8 @@ export function useWorkspaceLocalUpload({
     }
     return references;
   });
+  const localMatchedCount = computed(() => localMatchedImages.value.length);
+  const localMissingCount = computed(() => localMissingReferences.value.length);
   const localFilteredImages = computed(() =>
     localImageFilter.value === 'matched' ? localMatchedImages.value : localImages.value
   );
@@ -137,7 +137,7 @@ export function useWorkspaceLocalUpload({
     localImageFilter.value = filter;
   }
   function localStatusLabel(status: LocalDocument['status']) {
-    return { ready: t('msg.local.statusReady'), analyzed: t('msg.local.statusMatched'), success: t('msg.local.statusUploaded'), partial: t('msg.local.statusPartial'), failed: t('msg.statusFailed') }[status];
+    return { ready: t('msg.local.statusReady'), analyzed: t('msg.local.statusAnalyzed'), success: t('msg.local.statusUploaded'), partial: t('msg.local.statusPartial'), failed: t('msg.statusFailed') }[status];
   }
   function readPersistedLocalUploadWorkspace() {
     try {
@@ -627,16 +627,24 @@ export function useWorkspaceLocalUpload({
   function analyzeLocalMatches() {
     for (const document of localDocuments.value) {
       const references = extractMarkdownImages(document.content).filter(image => isLocalImageReference(image.url));
+      const uniqueSources: string[] = [];
+      const seen = new Set<string>();
+      for (const reference of references) {
+        const source = reference.url.trim();
+        if (seen.has(source)) continue;
+        seen.add(source);
+        uniqueSources.push(source);
+      }
       const missing: string[] = [];
       let matched = 0;
-      for (const reference of references) {
-        if (findLocalImage(reference.url)) matched += 1;
-        else missing.push(reference.url);
+      for (const source of uniqueSources) {
+        if (findLocalImage(source)) matched += 1;
+        else missing.push(source);
       }
       document.references = references;
       document.matched = matched;
-      document.missing = [...new Set(missing)];
-      document.status = document.status === 'success' || document.status === 'failed' ? document.status : 'analyzed';
+      document.missing = missing;
+      document.status = document.status === 'success' || document.status === 'partial' || document.status === 'failed' ? document.status : 'analyzed';
       document.error = '';
     }
   }

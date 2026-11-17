@@ -60,7 +60,7 @@ export const en: Record<keyof typeof zh, string> = {
   'local.scanTitle': 'Choose Image Folder',
   'local.scanDesc': '{count} images were found in the selected folder. Add them to the local image list?',
   'local.scanConfirm': 'Add to list',
-  'local.refsMatched': '{refs} local references · {matched} matched',
+  'local.refsMatched': '{refs} local references · {matched} matched · {missing} missing',
   'local.missingList': 'Missing: {list}',
   'local.docEmpty': 'Upload Markdown files to see local image matching here',
   'local.imagesCount': 'Images {count}',
@@ -460,6 +460,7 @@ export const en: Record<keyof typeof zh, string> = {
 
   'msg.local.statusReady': 'Pending match',
   'msg.local.statusMatched': 'Matched',
+  'msg.local.statusAnalyzed': 'Analyzed',
   'msg.local.statusUploaded': 'Uploaded',
   'msg.local.statusPartial': 'Partially done',
   'msg.local.noResult': 'No upload-replacement result found',

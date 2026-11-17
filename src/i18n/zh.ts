@@ -58,7 +58,7 @@ export const zh = {
   'local.scanTitle': '选择图片目录',
   'local.scanDesc': '在所选目录中找到 {count} 张图片，是否加入本地图片列表？',
   'local.scanConfirm': '加入列表',
-  'local.refsMatched': '{refs} 个本地引用 · 已匹配 {matched}',
+  'local.refsMatched': '{refs} 个本地引用 · 已匹配 {matched} · 缺失 {missing}',
   'local.missingList': '缺少：{list}',
   'local.docEmpty': '上传 Markdown 后，会在这里显示本地图片匹配情况',
   'local.imagesCount': '图片 {count}',
@@ -458,6 +458,7 @@ export const zh = {
 
   'msg.local.statusReady': '待匹配',
   'msg.local.statusMatched': '已匹配',
+  'msg.local.statusAnalyzed': '已识别',
   'msg.local.statusUploaded': '已上传',
   'msg.local.statusPartial': '部分完成',
   'msg.local.noResult': '未找到上传替换结果',
