@@ -206,7 +206,7 @@ function confirmClearDocuments() {
         </div>
       </label>
       <div class="actions compact-actions">
-        <button class="secondary" type="button" :disabled="loading || downloadDocuments.length === 0" @click="analyzeDownloadDocuments">
+        <button class="secondary" type="button" :disabled="loading || downloadDocuments.length === 0" @click="analyzeDownloadDocuments(true)">
           <FileSearch :size="18" />{{ t('download.analyzeDocs') }}</button
         ><button class="primary" type="button" :disabled="!canDownloadBatch" @click="downloadAllImages">
           <DownloadCloud :size="18" />{{ downloadActive ? t('download.downloading') : t('download.start') }}

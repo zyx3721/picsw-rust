@@ -32,6 +32,15 @@ function recordStatusLabel(status: string) {
   return t('records.statusFailed');
 }
 
+async function refreshRecords() {
+  try {
+    await loadRecords();
+    showMessage(t('msg.records.refreshed', { count: records.value.length }));
+  } catch (error) {
+    showError(error instanceof Error ? localizeError(error.message) : t('msg.records.refreshFailed'));
+  }
+}
+
 /// 时间范围过滤的起止毫秒边界；自定义范围含起止当日全天
 function rangeBounds(range: string): [number | null, number | null] {
   if (range === 'today') {
@@ -381,7 +390,7 @@ function hideUrlTooltip() {
           @clear="clearCustomRange"
         />
       </div>
-      <button class="secondary" type="button" @click="loadRecords">
+      <button class="secondary" type="button" @click="refreshRecords">
         <RefreshCw :size="18" />{{ t('records.refresh') }}
       </button>
       <button class="danger" type="button" :disabled="deletingRecords || selectedRecordCount === 0" @click="deleteSelectedRecords">

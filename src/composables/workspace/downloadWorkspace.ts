@@ -242,7 +242,7 @@ export function useWorkspaceDownload({
     }
   }
 
-  async function analyzeDownloadDocuments() {
+  async function analyzeDownloadDocuments(notify = false) {
     if (downloadDocuments.value.length === 0) {
       downloadItems.value = [];
       clearPersistedDownloadWorkspace();
@@ -261,6 +261,15 @@ export function useWorkspaceDownload({
       }
       rebuildItems();
       persistDownloadWorkspace();
+      if (notify) {
+        const images = downloadDocuments.value.reduce((sum, doc) => sum + doc.images.length, 0);
+        const duplicates = Math.max(0, images - downloadItems.value.length);
+        showMessage(t('msg.download.analyzed', {
+          documents: downloadDocuments.value.length,
+          images,
+          duplicateSuffix: duplicates > 0 ? t('download.duplicateSuffix', { count: duplicates }) : '',
+        }));
+      }
     } catch (error) {
       showError(error instanceof Error ? error.message : t('msg.download.analyzeFailed'));
     } finally {

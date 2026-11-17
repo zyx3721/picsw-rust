@@ -501,6 +501,7 @@ export const zh = {
   'msg.local.savedCount': '已保存 {count} 个替换后的文档',
 
   'msg.download.analyzeFailed': '分析网络图片失败',
+  'msg.download.analyzed': '已分析 {documents} 个文档，共 {images} 张网络图片{duplicateSuffix}',
   'msg.download.done': '下载完成：成功 {success} 张，已保存到 {dir}',
   'msg.download.donePartial': '下载完成：成功 {success} 张，失败 {failed} 张',
   'msg.download.skippedSuffix': '，跳过 {count} 张（文件已存在）',
@@ -626,5 +627,7 @@ export const zh = {
   'msg.records.detailFailed': '读取转换记录详情失败',
   'msg.records.deleted': '已删除 {count} 条转换记录',
   'msg.records.deleteFailed': '删除转换记录失败',
+  'msg.records.refreshed': '历史记录已刷新，共 {count} 条',
+  'msg.records.refreshFailed': '刷新历史记录失败',
   'msg.workspace.initFailed': '初始化工作区失败',
 } as const;

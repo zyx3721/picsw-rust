@@ -503,6 +503,7 @@ export const en: Record<keyof typeof zh, string> = {
   'msg.local.savedCount': 'Saved {count} replaced documents',
 
   'msg.download.analyzeFailed': 'Failed to analyze remote images',
+  'msg.download.analyzed': 'Analyzed {documents} documents · {images} remote images{duplicateSuffix}',
   'msg.download.done': 'Download finished: {success} images succeeded, saved to {dir}',
   'msg.download.donePartial': 'Download finished: {success} images succeeded, {failed} failed',
   'msg.download.skippedSuffix': ', {count} skipped (file already exists)',
@@ -628,5 +629,7 @@ export const en: Record<keyof typeof zh, string> = {
   'msg.records.detailFailed': 'Failed to load record details',
   'msg.records.deleted': 'Deleted {count} conversion records',
   'msg.records.deleteFailed': 'Failed to delete conversion records',
+  'msg.records.refreshed': 'Records refreshed · {count} total',
+  'msg.records.refreshFailed': 'Failed to refresh records',
   'msg.workspace.initFailed': 'Failed to initialize the workspace',
 };
