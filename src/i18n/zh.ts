@@ -73,6 +73,9 @@ export const zh = {
   'local.clearImagesTitle': '清空本地图片来源',
   'local.clearImagesDesc': '确认移除全部 {count} 张本地图片吗？文档中的本地引用会重新标记为缺失',
   'local.clearImagesConfirm': '清空图片',
+  'local.filterGroup': '本地图片状态筛选',
+  'local.filterEmpty': '当前筛选下没有图片',
+  'local.missingBadge': '缺失',
 
   'download.docTitle': '网络图片文档',
   'download.imagesTitle': '网络图片列表',

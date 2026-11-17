@@ -1,7 +1,16 @@
 import { computed, ref, type Ref } from 'vue';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
-import type { ConversionRecord, ConversionTask, LocalDocument, LocalImageFile, MarkdownImage, PicbedConfig, TaskDocumentProgress } from './types';
+import type {
+  ConversionRecord,
+  ConversionTask,
+  LocalDocument,
+  LocalImageFile,
+  LocalImageFilter,
+  MarkdownImage,
+  PicbedConfig,
+  TaskDocumentProgress,
+} from './types';
 import { t } from '../../i18n';
 import { localizeBackendText } from '../../i18n/errorText';
 
@@ -71,6 +80,7 @@ export function useWorkspaceLocalUpload({
   const localImageDragActive = ref(false);
   const localDocuments = ref<LocalDocument[]>([]);
   const localImages = ref<LocalImageFile[]>([]);
+  const localImageFilter = ref<LocalImageFilter>('all');
   let activeLocalTaskId = 0;
   let localPollVersion = 0;
 
@@ -81,6 +91,28 @@ export function useWorkspaceLocalUpload({
   );
   const localMatchedCount = computed(() => localDocuments.value.reduce((sum, item) => sum + item.matched, 0));
   const localMissingCount = computed(() => localDocuments.value.reduce((sum, item) => sum + item.missing.length, 0));
+  const localMatchedImages = computed(() => {
+    const matchedKeys = new Set<string>();
+    for (const document of localDocuments.value) {
+      for (const reference of document.references) {
+        const image = findLocalImage(reference.url);
+        if (image) matchedKeys.add(image.key);
+      }
+    }
+    return localImages.value.filter(image => matchedKeys.has(image.key));
+  });
+  const localMissingReferences = computed(() => {
+    const references: string[] = [];
+    for (const document of localDocuments.value) {
+      for (const path of document.missing) {
+        if (!references.includes(path)) references.push(path);
+      }
+    }
+    return references;
+  });
+  const localFilteredImages = computed(() =>
+    localImageFilter.value === 'matched' ? localMatchedImages.value : localImages.value
+  );
   const localConvertedCount = computed(() => localDocuments.value.filter(item => item.status === 'success').length);
   const canUploadLocalBatch = computed(
     () => localDocuments.value.length > 0 && localMatchedCount.value > 0 && localMissingCount.value === 0
@@ -92,6 +124,9 @@ export function useWorkspaceLocalUpload({
   function selectLocalTargetConfig(id: number) {
     localTargetConfigId.value = id;
     localTargetDropdownOpen.value = false;
+  }
+  function setLocalImageFilter(filter: LocalImageFilter) {
+    localImageFilter.value = filter;
   }
   function localStatusLabel(status: LocalDocument['status']) {
     return { ready: t('msg.local.statusReady'), analyzed: t('msg.local.statusMatched'), success: t('msg.local.statusUploaded'), failed: t('msg.statusFailed') }[status];
@@ -137,6 +172,7 @@ export function useWorkspaceLocalUpload({
     localImageDragActive.value = false;
     localDocuments.value = [];
     localImages.value = [];
+    localImageFilter.value = 'all';
     clearPersistedLocalUploadWorkspace();
   }
   async function addLocalDocuments(fileList: FileList | File[]) {
@@ -217,6 +253,7 @@ export function useWorkspaceLocalUpload({
     const count = localImages.value.length;
     if (!count) return;
     localImages.value = [];
+    localImageFilter.value = 'all';
     analyzeLocalMatches();
     showMessage(t('msg.local.clearedImages', { count }));
   }
@@ -332,6 +369,7 @@ export function useWorkspaceLocalUpload({
       activeLocalTaskId = taskId;
       persistLocalUploadWorkspace(taskId);
       localImages.value = [];
+      localImageFilter.value = 'all';
       updateTaskProgress({ message: localizeBackendText(created.task.message) || t('msg.local.taskQueued'), current: 0, success: 0, failed: 0 });
       await pollLocalUploadTask(taskId);
     } catch (err) {
@@ -469,6 +507,10 @@ export function useWorkspaceLocalUpload({
     localImageDragActive,
     localDocuments,
     localImages,
+    localImageFilter,
+    localFilteredImages,
+    localMatchedImages,
+    localMissingReferences,
     localTargetConfigs,
     selectedLocalTargetConfig,
     localMatchedCount,
@@ -477,6 +519,7 @@ export function useWorkspaceLocalUpload({
     canUploadLocalBatch,
     localTargetConfigLabel,
     selectLocalTargetConfig,
+    setLocalImageFilter,
     localStatusLabel,
     resetLocalUploadForm,
     handleLocalDocumentFiles,

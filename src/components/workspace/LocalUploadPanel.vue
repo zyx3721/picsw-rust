@@ -14,6 +14,9 @@ const {
   localImageDragActive,
   localDocuments,
   localImages,
+  localImageFilter,
+  localFilteredImages,
+  localMissingReferences,
   localTargetConfigs,
   selectedLocalTargetConfig,
   localMatchedCount,
@@ -22,6 +25,7 @@ const {
   canUploadLocalBatch,
   localTargetConfigLabel,
   selectLocalTargetConfig,
+  setLocalImageFilter,
   localStatusLabel,
   typeLabel,
   handleLocalDocumentFiles,
@@ -147,10 +151,34 @@ function confirmClear() {
         /></label>
       </div>
     </div>
-    <div class="local-summary">
-      <span>{{ t('local.imagesCount', { count: localImages.length }) }}</span>
-      <span>{{ t('local.matchedCount', { count: localMatchedCount }) }}</span>
-      <span>{{ t('local.missingCount', { count: localMissingCount }) }}</span>
+    <div class="local-summary summary-filters" role="group" :aria-label="t('local.filterGroup')">
+      <button
+        class="summary-filter"
+        :class="{ active: localImageFilter === 'all' }"
+        type="button"
+        :aria-pressed="localImageFilter === 'all'"
+        @click="setLocalImageFilter('all')"
+      >
+        {{ t('local.imagesCount', { count: localImages.length }) }}
+      </button>
+      <button
+        class="summary-filter"
+        :class="{ active: localImageFilter === 'matched' }"
+        type="button"
+        :aria-pressed="localImageFilter === 'matched'"
+        @click="setLocalImageFilter('matched')"
+      >
+        {{ t('local.matchedCount', { count: localMatchedCount }) }}
+      </button>
+      <button
+        class="summary-filter"
+        :class="{ active: localImageFilter === 'missing' }"
+        type="button"
+        :aria-pressed="localImageFilter === 'missing'"
+        @click="setLocalImageFilter('missing')"
+      >
+        {{ t('local.missingCount', { count: localMissingCount }) }}
+      </button>
     </div>
     <div v-if="localImages.length" class="batch-list-head">
       <span>{{ t('local.imageCountLabel', { count: localImages.length }) }}</span>
@@ -158,8 +186,8 @@ function confirmClear() {
         <Trash2 :size="15" />{{ t('convert.clearAll') }}
       </button>
     </div>
-    <div class="batch-list local-image-list">
-      <div v-for="image in localImages" :key="image.key" class="batch-row local-image-row" data-status="analyzed">
+    <div v-if="localImageFilter !== 'missing'" class="batch-list local-image-list">
+      <div v-for="image in localFilteredImages" :key="image.key" class="batch-row local-image-row" data-status="analyzed">
         <div>
           <strong>{{ image.name }}</strong>
           <span>{{ image.path }}</span>
@@ -170,7 +198,18 @@ function confirmClear() {
           </button>
         </div>
       </div>
-      <p v-if="localImages.length === 0" class="empty">{{ t('local.imageEmpty') }}</p>
+      <p v-if="localFilteredImages.length === 0" class="empty">
+        {{ localImages.length ? t('local.filterEmpty') : t('local.imageEmpty') }}
+      </p>
+    </div>
+    <div v-else class="batch-list local-image-list">
+      <div v-for="path in localMissingReferences" :key="path" class="batch-row local-image-row" data-status="failed">
+        <div>
+          <strong :title="path">{{ path }}</strong>
+          <span>{{ t('local.missingBadge') }}</span>
+        </div>
+      </div>
+      <p v-if="localMissingReferences.length === 0" class="empty">{{ t('local.filterEmpty') }}</p>
     </div>
   </div>
   <div class="panel stack local-action-panel">

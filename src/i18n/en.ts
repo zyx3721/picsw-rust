@@ -75,6 +75,9 @@ export const en: Record<keyof typeof zh, string> = {
   'local.clearImagesTitle': 'Clear Local Image Sources',
   'local.clearImagesDesc': 'Remove all {count} local images? Local references in documents will be marked missing again.',
   'local.clearImagesConfirm': 'Clear Images',
+  'local.filterGroup': 'Local image status filter',
+  'local.filterEmpty': 'No images in this filter',
+  'local.missingBadge': 'Missing',
 
   'download.docTitle': 'Remote Image Documents',
   'download.imagesTitle': 'Remote Image List',

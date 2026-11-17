@@ -89,6 +89,8 @@ export type LocalImageFile = {
   file: File;
 };
 
+export type LocalImageFilter = 'all' | 'matched' | 'missing';
+
 export type DownloadDocument = {
   id: string;
   filename: string;
