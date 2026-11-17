@@ -2,14 +2,14 @@ import { computed, reactive, ref, type Ref } from 'vue';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { createClientId } from './api';
 import { isGithubImageURL, normalizeProxyURL, withGithubProxy } from './imageProxy';
-import type { BatchFile, ConversionRecord, ConversionTask, MarkdownImage, PicbedConfig, TaskDocumentProgress } from './types';
+import type { BatchFile, ConversionRecord, ConversionTask, MarkdownImage, PicbedConfig, TaskDocumentProgress, TaskKind, TaskProgressStatus } from './types';
 import { t } from '../../i18n';
 import { localizeBackendText } from '../../i18n/errorText';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const CONVERT_WORKSPACE_STORAGE_KEY = 'picbed_convert_workspace';
 
-type ConvertTaskData = { task: ConversionTask; records: ConversionRecord[]; documents?: TaskDocumentProgress[] };
+type ConvertTaskData = { task: ConversionTask; records: ConversionRecord[]; documents?: TaskDocumentProgress[]; resumable?: boolean };
 
 type PersistedConvertWorkspace = {
   targetConfigId: number;
@@ -19,7 +19,7 @@ type PersistedConvertWorkspace = {
 };
 
 function taskFinished(task: ConversionTask) {
-  return task.status === 'success' || task.status === 'failed';
+  return task.status === 'success' || task.status === 'failed' || task.status === 'interrupted' || task.status === 'cancelled';
 }
 
 function taskProgressValue(task: ConversionTask) {
@@ -39,16 +39,20 @@ type ConvertWorkspaceDeps = {
   loadRecords: () => Promise<void>;
   typeLabel: (value: string) => string;
   loading: Ref<boolean>;
-  startTaskProgress: (input: { title: string; message: string; total: number; detail?: string }) => void;
+  startTaskProgress: (input: { title: string; message: string; total: number; detail?: string; taskId?: number; taskKind?: TaskKind }) => void;
   updateTaskProgress: (input: {
     message?: string;
     detail?: string;
     current?: number;
+    total?: number;
     success?: number;
     failed?: number;
     documents?: TaskDocumentProgress[];
+    taskId?: number;
+    taskKind?: TaskKind;
+    resumable?: boolean;
   }) => void;
-  finishTaskProgress: (input: { status: 'success' | 'failed'; message: string; detail?: string }) => void;
+  finishTaskProgress: (input: { status: Exclude<TaskProgressStatus, 'idle' | 'running'>; message: string; detail?: string; current?: number; resumable?: boolean }) => void;
 };
 
 export function useWorkspaceConvert({
@@ -150,6 +154,7 @@ export function useWorkspaceConvert({
   function syncTaskProgress(task: ConversionTask, documents?: TaskDocumentProgress[]) {
     updateTaskProgress({
       current: taskProgressValue(task),
+      total: task.total,
       success: task.success,
       failed: task.failed,
       message: localizeBackendText(task.message) || t('msg.convert.taskRunning'),
@@ -319,14 +324,38 @@ export function useWorkspaceConvert({
       if (taskFinished(data.task)) {
         activeTaskId = 0;
         applyTaskRecords(data);
-        const finalStatus = data.task.failed > 0 ? 'failed' : 'success';
-        finishTaskProgress({
-          status: finalStatus,
-          message: localizeBackendText(data.task.message) || t('msg.convert.taskDone', { success: data.task.success, failed: data.task.failed }),
-          detail: t('msg.convert.taskDoneHint'),
-        });
-        showMessage(t('msg.convert.batchDone', { count: convertedCount.value }));
-        persistConvertWorkspace(0);
+        if (data.task.status === 'interrupted') {
+          activeTaskId = taskId;
+          persistConvertWorkspace(taskId);
+          const message = t('msg.convert.progressInterrupted');
+          finishTaskProgress({
+            status: 'interrupted',
+            message,
+            detail: t('msg.taskInterruptedHint'),
+            current: data.task.success + data.task.failed,
+            resumable: data.resumable === true,
+          });
+          showError(message);
+        } else if (data.task.status === 'cancelled') {
+          persistConvertWorkspace(0);
+          finishTaskProgress({
+            status: 'cancelled',
+            message: t('msg.taskCancelled'),
+            current: data.task.success + data.task.failed,
+          });
+          showMessage(t('msg.taskCancelled'));
+        } else {
+          persistConvertWorkspace(0);
+          const finalStatus = data.task.failed > 0 ? 'failed' : 'success';
+          const message = localizeBackendText(data.task.message) || t('msg.convert.taskDone', { success: data.task.success, failed: data.task.failed });
+          finishTaskProgress({
+            status: finalStatus,
+            message,
+            detail: t('msg.convert.taskDoneHint'),
+          });
+          if (finalStatus === 'success') showMessage(t('msg.convert.batchDone', { count: convertedCount.value }));
+          else showError(message);
+        }
         await loadRecords();
         return;
       }
@@ -343,6 +372,8 @@ export function useWorkspaceConvert({
 
     loading.value = true;
     startTaskProgress({
+      taskId: state.activeTaskId,
+      taskKind: 'convert',
       title: t('msg.convert.progressTitle'),
       message: t('msg.convert.progressRestoring'),
       detail: t('msg.convert.progressRestored', { count: batchFiles.value.length }),
@@ -368,6 +399,7 @@ export function useWorkspaceConvert({
     loading.value = true;
     githubProxyDialogOpen.value = false;
     startTaskProgress({
+      taskKind: 'convert',
       title: t('msg.convert.progressTitle'),
       message: t('msg.convert.creating'),
       detail: t('msg.convert.progressDetail', { documents: batchFiles.value.length, images: totalImages.value }),
@@ -386,7 +418,7 @@ export function useWorkspaceConvert({
       const taskId = created.task.id;
       activeTaskId = taskId;
       persistConvertWorkspace(taskId);
-      updateTaskProgress({ message: localizeBackendText(created.task.message) || t('msg.convert.taskQueued'), current: 0, success: 0, failed: 0 });
+      updateTaskProgress({ taskId, taskKind: 'convert', message: localizeBackendText(created.task.message) || t('msg.convert.taskQueued'), current: 0, success: 0, failed: 0 });
       await pollConvertTask(taskId);
     } catch (err) {
       persistConvertWorkspace(activeTaskId);
@@ -400,6 +432,58 @@ export function useWorkspaceConvert({
     } finally {
       loading.value = false;
     }
+  }
+  async function resumeConvertTask(taskId: number) {
+    loading.value = true;
+    startTaskProgress({
+      taskId,
+      taskKind: 'convert',
+      title: t('msg.convert.progressTitle'),
+      message: t('msg.taskResuming'),
+      total: Math.max(batchFiles.value.length, 1),
+    });
+    try {
+      await request(`/api/convert/tasks/${taskId}/resume`, { method: 'POST' });
+    } catch (err) {
+      persistConvertWorkspace(taskId);
+      finishTaskProgress({
+        status: 'interrupted',
+        message: t('msg.taskResumeFailed'),
+        detail: err instanceof Error ? err.message : t('msg.retryHint'),
+        resumable: true,
+      });
+      showError(err instanceof Error ? err.message : t('msg.taskResumeFailed'));
+      loading.value = false;
+      return;
+    }
+    try {
+      persistConvertWorkspace(taskId);
+      await pollConvertTask(taskId, 0);
+    } catch (err) {
+      persistConvertWorkspace(taskId);
+      finishTaskProgress({
+        status: 'failed',
+        message: t('msg.convert.progressSyncFailed'),
+        detail: err instanceof Error ? err.message : t('msg.retryHint'),
+      });
+      showError(err instanceof Error ? err.message : t('msg.convert.progressSyncFailed'));
+    } finally {
+      loading.value = false;
+    }
+  }
+  async function cancelConvertTask(taskId: number): Promise<boolean> {
+    try {
+      await request(`/api/convert/tasks/${taskId}/cancel`, { method: 'POST' });
+      updateTaskProgress({ message: t('msg.taskCancelling') });
+      return true;
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('msg.taskCancelFailed'));
+      return false;
+    }
+  }
+  function clearActiveConvertTaskMarker() {
+    activeTaskId = 0;
+    persistConvertWorkspace(0);
   }
   async function downloadFile(file: BatchFile) {
     if (!file.convertedContent) return;
@@ -469,6 +553,9 @@ export function useWorkspaceConvert({
     targetConfigLabel,
     selectTargetConfig,
     restoreConvertWorkspace,
+    resumeConvertTask,
+    cancelConvertTask,
+    clearActiveConvertTaskMarker,
     stopConvertTaskPolling,
     resetConvertForm,
     handleFiles,

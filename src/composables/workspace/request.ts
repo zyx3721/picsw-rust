@@ -140,6 +140,11 @@ export function createWorkspaceRequest() {
       if (method === 'GET' && /^\/api\/convert\/tasks\/\d+$/.test(normalized)) {
         return await invoke<T>('get_convert_task', { id: parsePathId(normalized) });
       }
+      const taskActionMatch = normalized.match(/^\/api\/convert\/tasks\/(\d+)\/(resume|cancel)$/);
+      if (method === 'POST' && taskActionMatch) {
+        const id = Number.parseInt(taskActionMatch[1], 10);
+        return await invoke<T>(taskActionMatch[2] === 'resume' ? 'resume_convert_task' : 'cancel_convert_task', { id });
+      }
       if (method === 'GET' && /^\/api\/convert\/records\/\d+$/.test(normalized)) {
         return await invoke<T>('get_record', { id: parsePathId(normalized) });
       }

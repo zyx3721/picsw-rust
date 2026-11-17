@@ -203,6 +203,8 @@ pub fn get_convert_task(state: State<AppState>, id: i64) -> Result<Value, String
         return Err("任务 ID 不正确".to_string());
     }
     let task = load_task_json(&conn, id).ok_or("转换任务不存在")?;
+    let resumable = task.get("status").and_then(|value| value.as_str()) == Some("interrupted")
+        && task_queue::check_task_resumable(&conn, id).is_ok();
     let mut stmt = conn
         .prepare("SELECT id FROM conversion_records WHERE task_id = ?1 ORDER BY id ASC")
         .map_err(|e| e.to_string())?;
@@ -213,7 +215,68 @@ pub fn get_convert_task(state: State<AppState>, id: i64) -> Result<Value, String
         .filter_map(|record_id| load_record_with_details(&conn, *record_id))
         .collect();
     let documents = load_task_documents(&conn, id);
-    Ok(json!({ "task": task, "records": records, "documents": documents }))
+    Ok(json!({ "task": task, "records": records, "documents": documents, "resumable": resumable }))
+}
+
+#[tauri::command]
+pub async fn resume_convert_task(state: State<'_, AppState>, id: i64) -> Result<Value, String> {
+    if id <= 0 {
+        return Err("任务 ID 不正确".to_string());
+    }
+    {
+        let conn = lock_db(&state)?;
+        task_queue::check_task_resumable(&conn, id)?;
+        task_queue::prepare_task_resume(&conn, id).map_err(|_| "恢复任务失败".to_string())?;
+    }
+    state.clear_cancel(id);
+    if let Err(err) = task_queue::enqueue(&state, id).await {
+        let _ = lock_db(&state).map(|conn| {
+            conn.execute(
+                "UPDATE conversion_tasks SET status = 'interrupted', message = '恢复任务失败', error = ?2, ended_at = ?3, updated_at = ?3 WHERE id = ?1",
+                rusqlite::params![id, err, now_string()],
+            )
+        });
+        return Err("恢复任务失败".to_string());
+    }
+    let task = {
+        let conn = lock_db(&state)?;
+        load_task_json(&conn, id).ok_or("转换任务不存在")?
+    };
+    Ok(json!({ "task": task }))
+}
+
+#[tauri::command]
+pub fn cancel_convert_task(app: tauri::AppHandle, state: State<AppState>, id: i64) -> Result<Value, String> {
+    if id <= 0 {
+        return Err("任务 ID 不正确".to_string());
+    }
+    let handled = {
+        let conn = lock_db(&state)?;
+        task_queue::cancel_pending_task(&app, &conn, id)?
+    };
+    if handled {
+        state.clear_cancel(id);
+        return Ok(json!({ "message": "任务已取消" }));
+    }
+    let status = {
+        let conn = lock_db(&state)?;
+        task_queue::task_status(&conn, id)
+    };
+    match status.as_deref() {
+        Some("running") => {
+            state.request_cancel(id);
+            let _ = lock_db(&state).map(|conn| {
+                conn.execute(
+                    "UPDATE conversion_tasks SET message = '正在取消任务', updated_at = ?2 WHERE id = ?1 AND status = 'running'",
+                    rusqlite::params![id, now_string()],
+                )
+            });
+            Ok(json!({ "message": "正在取消任务" }))
+        }
+        Some("cancelled") => Ok(json!({ "message": "任务已取消" })),
+        Some(_) => Err("任务已结束，无法取消".to_string()),
+        None => Err("转换任务不存在".to_string()),
+    }
 }
 
 #[tauri::command]

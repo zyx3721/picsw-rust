@@ -1,14 +1,16 @@
 import { reactive } from 'vue';
-import type { TaskProgressState, TaskProgressStatus } from './types';
+import type { TaskKind, TaskProgressState, TaskProgressStatus } from './types';
 
 type StartTaskInput = {
   title: string;
   message: string;
   total: number;
   detail?: string;
+  taskId?: number;
+  taskKind?: TaskKind;
 };
 
-type UpdateTaskInput = Partial<Pick<TaskProgressState, 'message' | 'detail' | 'current' | 'success' | 'failed' | 'documents'>> & {
+type UpdateTaskInput = Partial<Pick<TaskProgressState, 'message' | 'detail' | 'current' | 'success' | 'failed' | 'documents' | 'total' | 'taskId' | 'taskKind' | 'resumable'>> & {
   status?: TaskProgressStatus;
 };
 
@@ -25,6 +27,9 @@ export function useTaskProgress() {
     status: 'idle',
     closable: true,
     documents: [],
+    taskId: 0,
+    taskKind: '',
+    resumable: false,
   });
 
   function startTaskProgress(input: StartTaskInput) {
@@ -39,24 +44,38 @@ export function useTaskProgress() {
     taskProgress.status = 'running';
     taskProgress.closable = false;
     taskProgress.documents = [];
+    taskProgress.taskId = input.taskId || 0;
+    taskProgress.taskKind = input.taskKind || '';
+    taskProgress.resumable = false;
   }
 
   function updateTaskProgress(input: UpdateTaskInput) {
     if (input.message !== undefined) taskProgress.message = input.message;
     if (input.detail !== undefined) taskProgress.detail = input.detail;
     if (input.current !== undefined) taskProgress.current = input.current;
+    if (input.total !== undefined) taskProgress.total = input.total;
     if (input.success !== undefined) taskProgress.success = input.success;
     if (input.failed !== undefined) taskProgress.failed = input.failed;
     if (input.documents !== undefined) taskProgress.documents = input.documents;
+    if (input.taskId !== undefined) taskProgress.taskId = input.taskId;
+    if (input.taskKind !== undefined) taskProgress.taskKind = input.taskKind;
+    if (input.resumable !== undefined) taskProgress.resumable = input.resumable;
     if (input.status !== undefined) taskProgress.status = input.status;
   }
 
-  function finishTaskProgress(input: { status: Exclude<TaskProgressStatus, 'idle' | 'running'>; message: string; detail?: string }) {
+  function finishTaskProgress(input: {
+    status: Exclude<TaskProgressStatus, 'idle' | 'running'>;
+    message: string;
+    detail?: string;
+    current?: number;
+    resumable?: boolean;
+  }) {
     taskProgress.status = input.status;
     taskProgress.message = input.message;
     taskProgress.detail = input.detail || '';
-    taskProgress.current = taskProgress.total;
+    taskProgress.current = input.current ?? taskProgress.total;
     taskProgress.closable = true;
+    taskProgress.resumable = input.resumable === true;
   }
 
   function closeTaskProgress() {
@@ -64,6 +83,9 @@ export function useTaskProgress() {
     taskProgress.open = false;
     taskProgress.status = 'idle';
     taskProgress.documents = [];
+    taskProgress.taskId = 0;
+    taskProgress.taskKind = '';
+    taskProgress.resumable = false;
   }
 
   return { taskProgress, startTaskProgress, updateTaskProgress, finishTaskProgress, closeTaskProgress };

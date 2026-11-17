@@ -143,14 +143,16 @@ export type SyncRemoteState = {
   configCount: number;
 } | null;
 
-export type TaskProgressStatus = 'idle' | 'running' | 'success' | 'failed';
+export type TaskKind = 'convert' | 'localUpload' | 'download' | '';
+
+export type TaskProgressStatus = 'idle' | 'running' | 'success' | 'failed' | 'interrupted' | 'cancelled';
 
 export type TaskDocumentProgress = {
   id: number;
   filename: string;
   total_images: number;
   processed_images: number;
-  status: 'queued' | 'running' | 'success' | 'failed';
+  status: 'queued' | 'running' | 'success' | 'failed' | 'interrupted' | 'cancelled';
   error: string;
 };
 
@@ -166,6 +168,9 @@ export type TaskProgressState = {
   status: TaskProgressStatus;
   closable: boolean;
   documents: TaskDocumentProgress[];
+  taskId: number;
+  taskKind: TaskKind;
+  resumable: boolean;
 };
 
 export type RequestError = Error & { status?: number };

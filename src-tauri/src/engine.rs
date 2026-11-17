@@ -11,6 +11,9 @@ use crate::AppState;
 
 pub const LOCAL_CONVERT_TASK_TYPE: &str = "local_upload";
 
+/// 用户主动取消任务时引擎返回的固定错误
+pub const TASK_CANCELLED: &str = "任务已取消";
+
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct MarkdownRequest {
     #[serde(default)]
@@ -134,6 +137,9 @@ pub async fn convert_one(
     task_id: Option<i64>,
     document_id: Option<i64>,
 ) -> Result<serde_json::Value, String> {
+    if state.is_task_cancelled(task_id) {
+        return Err(TASK_CANCELLED.to_string());
+    }
     if req.content.trim().is_empty() {
         return Err("Markdown 内容不能为空".to_string());
     }
@@ -164,6 +170,9 @@ pub async fn convert_one(
     let unique_urls = collect_unique_urls(&images);
     let mut resolved: HashMap<String, PendingImage> = HashMap::new();
     for image_url in unique_urls {
+        if state.is_task_cancelled(task_id) {
+            return Err(TASK_CANCELLED.to_string());
+        }
         if !is_http_image_url(&image_url) {
             resolved.insert(image_url.clone(), PendingImage::Keep(image_url));
             advance_document_progress(state, document_id);
@@ -224,6 +233,9 @@ pub async fn convert_one(
             message = "没有图片地址被转换".to_string();
         }
     }
+    if state.is_task_cancelled(task_id) {
+        return Err(TASK_CANCELLED.to_string());
+    }
     let record_value = {
         let conn = lock_db(state);
         let record = insert_record(
@@ -269,6 +281,9 @@ pub async fn convert_local_one(
     task_id: Option<i64>,
     document_id: Option<i64>,
 ) -> Result<serde_json::Value, String> {
+    if state.is_task_cancelled(task_id) {
+        return Err(TASK_CANCELLED.to_string());
+    }
     if document.content.trim().is_empty() {
         return Err("Markdown 内容不能为空".to_string());
     }
@@ -291,6 +306,9 @@ pub async fn convert_local_one(
     let unique_urls = collect_unique_urls(&images);
     let mut resolved: HashMap<String, PendingImage> = HashMap::new();
     for image_url in unique_urls {
+        if state.is_task_cancelled(task_id) {
+            return Err(TASK_CANCELLED.to_string());
+        }
         if is_http_image_url(&image_url) {
             resolved.insert(image_url.clone(), PendingImage::Keep(image_url));
             advance_document_progress(state, document_id);
@@ -363,6 +381,9 @@ pub async fn convert_local_one(
     if changed == 0 {
         status = "failed";
         message = "没有本地图片地址被转换".to_string();
+    }
+    if state.is_task_cancelled(task_id) {
+        return Err(TASK_CANCELLED.to_string());
     }
     let record_value = {
         let conn = lock_db(state);

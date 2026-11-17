@@ -1,9 +1,9 @@
 use tauri::Manager;
 
-/// 退出整个应用
+/// 退出整个应用，先把执行中的任务标记为中断
 #[tauri::command]
 pub fn exit_app(app: tauri::AppHandle) {
-    app.exit(0);
+    crate::exit_app_with_interrupt(&app);
 }
 
 /// 隐藏主窗口到系统托盘

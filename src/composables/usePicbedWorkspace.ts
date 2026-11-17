@@ -103,6 +103,9 @@ export function usePicbedWorkspace() {
     downloadFile,
     downloadAll,
     restoreConvertWorkspace,
+    resumeConvertTask,
+    cancelConvertTask,
+    clearActiveConvertTaskMarker,
     stopConvertTaskPolling,
     togglePreview,
     changedLines,
@@ -152,6 +155,9 @@ export function usePicbedWorkspace() {
     analyzeLocalBatch,
     uploadLocalBatch,
     restoreLocalUploadWorkspace,
+    resumeLocalUploadTask,
+    cancelLocalUploadTask,
+    clearActiveLocalUploadTaskMarker,
     stopLocalUploadTaskPolling,
     downloadLocalFile,
     downloadAllLocalFiles,
@@ -364,6 +370,36 @@ export function usePicbedWorkspace() {
       loading.value = false;
     }
   }
+  async function resumeTaskProgress() {
+    const taskId = taskProgress.taskId;
+    if (!taskId) return;
+    if (taskProgress.taskKind === 'convert') await resumeConvertTask(taskId);
+    else if (taskProgress.taskKind === 'localUpload') await resumeLocalUploadTask(taskId);
+  }
+  async function cancelTaskProgress() {
+    const taskId = taskProgress.taskId;
+    if (!taskId) return;
+    const wasInterrupted = taskProgress.status === 'interrupted';
+    let cancelled = false;
+    if (taskProgress.taskKind === 'convert') cancelled = await cancelConvertTask(taskId);
+    else if (taskProgress.taskKind === 'localUpload') cancelled = await cancelLocalUploadTask(taskId);
+    if (!cancelled || !wasInterrupted) return;
+    if (taskProgress.taskKind === 'convert') clearActiveConvertTaskMarker();
+    else clearActiveLocalUploadTaskMarker();
+    updateTaskProgress({
+      documents: taskProgress.documents.map(document =>
+        document.status === 'success' || document.status === 'failed'
+          ? document
+          : { ...document, status: 'cancelled' as const, error: '' }
+      ),
+    });
+    finishTaskProgress({
+      status: 'cancelled',
+      message: t('msg.taskCancelled'),
+      current: taskProgress.success + taskProgress.failed,
+    });
+    showMessage(t('msg.taskCancelled'));
+  }
   onMounted(() => {
     document.addEventListener('pointerdown', handleGlobalPointerDown);
     void loadWorkspaceData()
@@ -391,6 +427,8 @@ export function usePicbedWorkspace() {
     loading,
     taskProgress,
     closeTaskProgress,
+    resumeTaskProgress,
+    cancelTaskProgress,
     showMessage,
     showError,
     configForm,

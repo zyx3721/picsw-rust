@@ -10,6 +10,8 @@ import type {
   MarkdownImage,
   PicbedConfig,
   TaskDocumentProgress,
+  TaskKind,
+  TaskProgressStatus,
 } from './types';
 import { t } from '../../i18n';
 import { localizeBackendText } from '../../i18n/errorText';
@@ -17,7 +19,7 @@ import { localizeBackendText } from '../../i18n/errorText';
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 const LOCAL_UPLOAD_WORKSPACE_STORAGE_KEY = 'picbed_local_upload_workspace';
 
-type LocalTaskData = { task: ConversionTask; records: ConversionRecord[]; documents?: TaskDocumentProgress[] };
+type LocalTaskData = { task: ConversionTask; records: ConversionRecord[]; documents?: TaskDocumentProgress[]; resumable?: boolean };
 
 type PersistedLocalUploadWorkspace = {
   targetConfigId: number;
@@ -35,22 +37,26 @@ type LocalUploadWorkspaceDeps = {
   loadRecords: () => Promise<void>;
   typeLabel: (value: string) => string;
   loading: Ref<boolean>;
-  startTaskProgress: (input: { title: string; message: string; total: number; detail?: string }) => void;
+  startTaskProgress: (input: { title: string; message: string; total: number; detail?: string; taskId?: number; taskKind?: TaskKind }) => void;
   updateTaskProgress: (input: {
     message?: string;
     detail?: string;
     current?: number;
+    total?: number;
     success?: number;
     failed?: number;
     documents?: TaskDocumentProgress[];
+    taskId?: number;
+    taskKind?: TaskKind;
+    resumable?: boolean;
   }) => void;
-  finishTaskProgress: (input: { status: 'success' | 'failed'; message: string; detail?: string }) => void;
+  finishTaskProgress: (input: { status: Exclude<TaskProgressStatus, 'idle' | 'running'>; message: string; detail?: string; current?: number; resumable?: boolean }) => void;
 };
 
 const imageExtensions = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg', '.avif']);
 
 function taskFinished(task: ConversionTask) {
-  return task.status === 'success' || task.status === 'failed';
+  return task.status === 'success' || task.status === 'failed' || task.status === 'interrupted' || task.status === 'cancelled';
 }
 
 function taskProgressValue(task: ConversionTask) {
@@ -269,6 +275,7 @@ export function useWorkspaceLocalUpload({
   function syncLocalTaskProgress(task: ConversionTask, documents?: TaskDocumentProgress[]) {
     updateTaskProgress({
       current: taskProgressValue(task),
+      total: task.total,
       success: task.success,
       failed: task.failed,
       message: localizeBackendText(task.message) || t('msg.local.taskRunning'),
@@ -316,14 +323,38 @@ export function useWorkspaceLocalUpload({
       if (taskFinished(data.task)) {
         activeLocalTaskId = 0;
         applyLocalTaskRecords(data);
-        const finalStatus = data.task.failed > 0 ? 'failed' : 'success';
-        finishTaskProgress({
-          status: finalStatus,
-          message: localizeBackendText(data.task.message) || t('msg.local.taskDone', { success: data.task.success, failed: data.task.failed }),
-          detail: t('msg.local.taskDoneHint'),
-        });
-        showMessage(t('msg.local.batchDone', { count: localConvertedCount.value }));
-        persistLocalUploadWorkspace(0);
+        if (data.task.status === 'interrupted') {
+          activeLocalTaskId = taskId;
+          persistLocalUploadWorkspace(taskId);
+          const message = t('msg.local.progressInterrupted');
+          finishTaskProgress({
+            status: 'interrupted',
+            message,
+            detail: t('msg.taskInterruptedHint'),
+            current: data.task.success + data.task.failed,
+            resumable: data.resumable === true,
+          });
+          showError(message);
+        } else if (data.task.status === 'cancelled') {
+          persistLocalUploadWorkspace(0);
+          finishTaskProgress({
+            status: 'cancelled',
+            message: t('msg.taskCancelled'),
+            current: data.task.success + data.task.failed,
+          });
+          showMessage(t('msg.taskCancelled'));
+        } else {
+          persistLocalUploadWorkspace(0);
+          const finalStatus = data.task.failed > 0 ? 'failed' : 'success';
+          const message = localizeBackendText(data.task.message) || t('msg.local.taskDone', { success: data.task.success, failed: data.task.failed });
+          finishTaskProgress({
+            status: finalStatus,
+            message,
+            detail: t('msg.local.taskDoneHint'),
+          });
+          if (finalStatus === 'success') showMessage(t('msg.local.batchDone', { count: localConvertedCount.value }));
+          else showError(message);
+        }
         await loadRecords();
         return;
       }
@@ -351,6 +382,7 @@ export function useWorkspaceLocalUpload({
     }
     loading.value = true;
     startTaskProgress({
+      taskKind: 'localUpload',
       title: t('msg.local.progressTitle'),
       message: t('msg.local.creating'),
       detail: t('msg.local.progressDetail', { documents: localDocuments.value.length, images: localMatchedCount.value }),
@@ -370,7 +402,7 @@ export function useWorkspaceLocalUpload({
       persistLocalUploadWorkspace(taskId);
       localImages.value = [];
       localImageFilter.value = 'all';
-      updateTaskProgress({ message: localizeBackendText(created.task.message) || t('msg.local.taskQueued'), current: 0, success: 0, failed: 0 });
+      updateTaskProgress({ taskId, taskKind: 'localUpload', message: localizeBackendText(created.task.message) || t('msg.local.taskQueued'), current: 0, success: 0, failed: 0 });
       await pollLocalUploadTask(taskId);
     } catch (err) {
       persistLocalUploadWorkspace(activeLocalTaskId);
@@ -384,6 +416,58 @@ export function useWorkspaceLocalUpload({
     } finally {
       loading.value = false;
     }
+  }
+  async function resumeLocalUploadTask(taskId: number) {
+    loading.value = true;
+    startTaskProgress({
+      taskId,
+      taskKind: 'localUpload',
+      title: t('msg.local.progressTitle'),
+      message: t('msg.taskResuming'),
+      total: Math.max(localDocuments.value.length, 1),
+    });
+    try {
+      await request(`/api/convert/tasks/${taskId}/resume`, { method: 'POST' });
+    } catch (err) {
+      persistLocalUploadWorkspace(taskId);
+      finishTaskProgress({
+        status: 'interrupted',
+        message: t('msg.taskResumeFailed'),
+        detail: err instanceof Error ? err.message : t('msg.retryHint'),
+        resumable: true,
+      });
+      showError(err instanceof Error ? err.message : t('msg.taskResumeFailed'));
+      loading.value = false;
+      return;
+    }
+    try {
+      persistLocalUploadWorkspace(taskId);
+      await pollLocalUploadTask(taskId, 0);
+    } catch (err) {
+      persistLocalUploadWorkspace(taskId);
+      finishTaskProgress({
+        status: 'failed',
+        message: t('msg.local.progressSyncFailed'),
+        detail: err instanceof Error ? err.message : t('msg.retryHint'),
+      });
+      showError(err instanceof Error ? err.message : t('msg.local.progressSyncFailed'));
+    } finally {
+      loading.value = false;
+    }
+  }
+  async function cancelLocalUploadTask(taskId: number): Promise<boolean> {
+    try {
+      await request(`/api/convert/tasks/${taskId}/cancel`, { method: 'POST' });
+      updateTaskProgress({ message: t('msg.taskCancelling') });
+      return true;
+    } catch (err) {
+      showError(err instanceof Error ? err.message : t('msg.taskCancelFailed'));
+      return false;
+    }
+  }
+  function clearActiveLocalUploadTaskMarker() {
+    activeLocalTaskId = 0;
+    persistLocalUploadWorkspace(0);
   }
   async function downloadLocalFile(item: LocalDocument) {
     if (!item.convertedContent) return;
@@ -429,6 +513,8 @@ export function useWorkspaceLocalUpload({
 
     loading.value = true;
     startTaskProgress({
+      taskId: state.activeTaskId,
+      taskKind: 'localUpload',
       title: t('msg.local.progressTitle'),
       message: t('msg.convert.progressRestoring'),
       detail: t('msg.convert.progressRestored', { count: localDocuments.value.length }),
@@ -533,6 +619,9 @@ export function useWorkspaceLocalUpload({
     analyzeLocalBatch,
     uploadLocalBatch,
     restoreLocalUploadWorkspace,
+    resumeLocalUploadTask,
+    cancelLocalUploadTask,
+    clearActiveLocalUploadTaskMarker,
     stopLocalUploadTaskPolling,
     downloadLocalFile,
     downloadAllLocalFiles,

@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { CheckCircle2, LoaderCircle, XCircle } from 'lucide-vue-next';
+import { Ban, CheckCircle2, CircleAlert, LoaderCircle, XCircle } from 'lucide-vue-next';
 import { computed } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import type { TaskDocumentProgress } from '../../composables/workspace/types';
 import { t } from '../../i18n';
 import { localizeError } from '../../i18n/errorText';
 
-const { taskProgress, closeTaskProgress } = useWorkspaceContext();
+const { taskProgress, closeTaskProgress, resumeTaskProgress, cancelTaskProgress } = useWorkspaceContext();
 
 const progressPercent = computed(() => {
   const totalImages = taskProgress.documents.reduce((sum, document) => sum + document.total_images, 0);
@@ -16,6 +16,11 @@ const progressPercent = computed(() => {
   return Math.min(100, Math.round((taskProgress.current / taskProgress.total) * 100));
 });
 const isRunning = computed(() => taskProgress.status === 'running');
+const supportsTaskActions = computed(() => taskProgress.taskKind === 'convert' || taskProgress.taskKind === 'localUpload');
+const cancellable = computed(
+  () => supportsTaskActions.value && (taskProgress.status === 'running' || taskProgress.status === 'interrupted')
+);
+const showFooter = computed(() => supportsTaskActions.value || !isRunning.value);
 const runningDocumentCount = computed(
   () => taskProgress.documents.filter(document => document.status === 'running').length
 );
@@ -32,6 +37,8 @@ function documentStatusLabel(status: TaskDocumentProgress['status']) {
     running: t('dlg.task.docRunning'),
     success: t('dlg.task.docSuccess'),
     failed: t('dlg.task.docFailed'),
+    interrupted: t('dlg.task.docInterrupted'),
+    cancelled: t('dlg.task.docCancelled'),
   }[status];
 }
 
@@ -47,6 +54,8 @@ function documentCountLabel(document: TaskDocumentProgress) {
         <div class="dialog-icon task-progress-icon" :data-status="taskProgress.status">
           <LoaderCircle v-if="isRunning" :size="24" class="spin-icon" />
           <CheckCircle2 v-else-if="taskProgress.status === 'success'" :size="24" />
+          <CircleAlert v-else-if="taskProgress.status === 'interrupted'" :size="24" />
+          <Ban v-else-if="taskProgress.status === 'cancelled'" :size="24" />
           <XCircle v-else :size="24" />
         </div>
         <h2 id="task-progress-title">{{ taskProgress.title }}</h2>
@@ -92,8 +101,16 @@ function documentCountLabel(document: TaskDocumentProgress) {
         </div>
       </div>
       <p v-if="isRunning" class="task-progress-warning">{{ t('dlg.task.backgroundHint') }}</p>
-      <div v-else class="dialog-actions">
-        <button class="primary" type="button" @click="closeTaskProgress">{{ t('common.close') }}</button>
+      <div v-if="showFooter" class="dialog-actions task-progress-actions">
+        <template v-if="supportsTaskActions">
+          <button class="success-action" type="button" :disabled="!taskProgress.resumable" @click="resumeTaskProgress">
+            {{ t('dlg.task.resume') }}
+          </button>
+          <button class="danger" type="button" :disabled="!cancellable" @click="cancelTaskProgress">
+            {{ t('dlg.task.cancel') }}
+          </button>
+        </template>
+        <button v-if="!isRunning" class="primary" type="button" @click="closeTaskProgress">{{ t('common.close') }}</button>
       </div>
     </section>
   </div>

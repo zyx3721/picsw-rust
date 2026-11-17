@@ -72,7 +72,7 @@ pub async fn download_remote_images(
                 Ok(image) => {
                     item.file_name = image.filename.clone();
                     let path = unique_target(&target, &image.filename);
-                    match std::fs::write(&path, &image.data) {
+                    match write_atomically(&path, &image.data) {
                         Ok(()) => {
                             item.saved_path = path.to_string_lossy().to_string();
                             item.status = "success".to_string();
@@ -119,6 +119,20 @@ fn send_progress(
     });
 }
 
+/// 先写同目录临时文件再重命名，避免应用退出时留下写了一半的图片
+fn write_atomically(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    let file_name = path.file_name().and_then(|name| name.to_str()).unwrap_or("image.png");
+    let temp = path.with_file_name(format!("{file_name}.part"));
+    std::fs::write(&temp, data)?;
+    match std::fs::rename(&temp, path) {
+        Ok(()) => Ok(()),
+        Err(error) => {
+            let _ = std::fs::remove_file(&temp);
+            Err(error)
+        }
+    }
+}
+
 /// 同名文件自动追加序号，避免覆盖已下载内容
 fn unique_target(dir: &Path, filename: &str) -> PathBuf {
     let trimmed = filename.trim();
@@ -140,4 +154,23 @@ fn unique_target(dir: &Path, filename: &str) -> PathBuf {
         index += 1;
     }
     candidate
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_atomically;
+
+    #[test]
+    fn writes_file_through_temporary_name() {
+        let dir = std::env::temp_dir().join(format!("picsw-download-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("image.png");
+
+        write_atomically(&path, b"image-bytes").unwrap();
+
+        assert_eq!(std::fs::read(&path).unwrap(), b"image-bytes");
+        assert!(!dir.join("image.png.part").exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

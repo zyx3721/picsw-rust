@@ -2826,6 +2826,16 @@ th {
   background: var(--danger-soft);
   border-color: #ffd0cc;
 }
+.task-progress-icon[data-status='interrupted'] {
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: #f5d68a;
+}
+.task-progress-icon[data-status='cancelled'] {
+  color: var(--muted);
+  background: var(--surface-muted);
+  border-color: var(--border);
+}
 .spin-icon {
   animation: spin 0.9s linear infinite;
 }
@@ -2956,6 +2966,20 @@ th {
 .task-progress-doc[data-status='failed'] .task-progress-doc-meter span {
   background: var(--danger);
 }
+.task-progress-doc[data-status='interrupted'] .task-progress-doc-status {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.task-progress-doc[data-status='interrupted'] .task-progress-doc-meter span {
+  background: var(--warning);
+}
+.task-progress-doc[data-status='cancelled'] .task-progress-doc-status {
+  background: var(--surface-muted);
+  color: var(--muted);
+}
+.task-progress-doc[data-status='cancelled'] .task-progress-doc-meter span {
+  background: var(--border-strong);
+}
 .task-progress-doc-error {
   margin: 0;
   color: var(--danger);
@@ -2966,6 +2990,9 @@ th {
   margin: 0;
   color: var(--danger);
   font-weight: 800;
+}
+.task-progress-actions {
+  flex-wrap: wrap;
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
@@ -3481,6 +3508,9 @@ html.dark .password-dialog-icon,
 html.dark .task-progress-icon,
 html.dark .github-proxy-icon {
   border-color: rgba(45, 212, 191, 0.35);
+}
+html.dark .task-progress-icon[data-status='interrupted'] {
+  border-color: rgba(251, 191, 36, 0.35);
 }
 html.dark .close-dialog-head {
   background: rgba(248, 113, 113, 0.14);
