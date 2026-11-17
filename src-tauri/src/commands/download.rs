@@ -60,6 +60,9 @@ pub async fn create_download_task(state: State<'_, AppState>, req: CreateDownloa
             }
             urls.push(url);
         }
+        if urls.is_empty() {
+            continue;
+        }
         total_images += urls.len();
         documents.push((document.filename, urls));
     }
