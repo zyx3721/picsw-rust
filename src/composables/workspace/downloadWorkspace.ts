@@ -29,6 +29,7 @@ type DownloadTaskData = {
 
 type PersistedDownloadWorkspace = {
   documents: DownloadDocument[];
+  items?: DownloadImageItem[];
   targetDir: string;
   activeTaskId?: number;
   savedAt: number;
@@ -147,6 +148,7 @@ export function useWorkspaceDownload({
     try {
       const state: PersistedDownloadWorkspace = {
         documents: downloadDocuments.value,
+        items: downloadItems.value,
         targetDir: downloadTargetDir.value,
         activeTaskId: taskId || undefined,
         savedAt: Date.now(),
@@ -154,6 +156,19 @@ export function useWorkspaceDownload({
       localStorage.setItem(DOWNLOAD_WORKSPACE_STORAGE_KEY, JSON.stringify(state));
     } catch {
       // 本地存储不可用时任务仍由后端继续执行
+    }
+  }
+
+  function applyPersistedItems(items?: DownloadImageItem[]) {
+    if (!items?.length) return;
+    const byUrl = new Map(items.map(item => [item.url, item]));
+    for (const item of downloadItems.value) {
+      const saved = byUrl.get(item.url);
+      if (!saved) continue;
+      item.status = saved.status;
+      item.error = saved.error;
+      item.savedPath = saved.savedPath;
+      if (saved.name) item.name = saved.name;
     }
   }
 
@@ -223,6 +238,7 @@ export function useWorkspaceDownload({
   async function analyzeDownloadDocuments() {
     if (downloadDocuments.value.length === 0) {
       downloadItems.value = [];
+      clearPersistedDownloadWorkspace();
       return;
     }
     loading.value = true;
@@ -237,6 +253,7 @@ export function useWorkspaceDownload({
         doc.error = '';
       }
       rebuildItems();
+      persistDownloadWorkspace();
     } catch (error) {
       showError(error instanceof Error ? error.message : t('msg.download.analyzeFailed'));
     } finally {
@@ -285,6 +302,8 @@ export function useWorkspaceDownload({
   function removeDownloadDocument(id: string) {
     downloadDocuments.value = downloadDocuments.value.filter(item => item.id !== id);
     rebuildItems();
+    if (downloadDocuments.value.length) persistDownloadWorkspace();
+    else clearPersistedDownloadWorkspace();
   }
 
   function clearDownloadDocuments() {
@@ -293,12 +312,16 @@ export function useWorkspaceDownload({
     downloadDocuments.value = [];
     downloadItems.value = [];
     downloadFilter.value = 'all';
+    clearPersistedDownloadWorkspace();
     showMessage(t('msg.download.cleared', { count }));
   }
 
   async function selectDownloadDir() {
     const dir = await open({ directory: true, multiple: false });
-    if (typeof dir === 'string' && dir) downloadTargetDir.value = dir;
+    if (typeof dir === 'string' && dir) {
+      downloadTargetDir.value = dir;
+      if (downloadDocuments.value.length) persistDownloadWorkspace();
+    }
   }
 
   function syncDownloadTaskProgress(task: ConversionTask, documents?: TaskDocumentProgress[]) {
@@ -344,7 +367,7 @@ export function useWorkspaceDownload({
           });
           showError(message);
         } else if (data.task.status === 'cancelled') {
-          clearPersistedDownloadWorkspace();
+          persistDownloadWorkspace(0);
           finishTaskProgress({
             status: 'cancelled',
             message: t('msg.taskCancelled'),
@@ -352,7 +375,7 @@ export function useWorkspaceDownload({
           });
           showMessage(t('msg.taskCancelled'));
         } else {
-          clearPersistedDownloadWorkspace();
+          persistDownloadWorkspace(0);
           const failed = downloadFailedCount.value;
           const message = failed > 0
             ? t('msg.download.donePartial', { success: downloadSuccessCount.value, failed })
@@ -475,24 +498,28 @@ export function useWorkspaceDownload({
 
   function clearActiveDownloadTaskMarker() {
     activeDownloadTaskId = 0;
-    clearPersistedDownloadWorkspace();
+    persistDownloadWorkspace(0);
   }
 
   function markCancelledState() {
     downloadItems.value.forEach(item => {
       if (item.status === 'pending' || item.status === 'downloading') item.status = 'cancelled';
     });
+    persistDownloadWorkspace(0);
   }
 
   function restoreDownloadWorkspace(): 'download' | null {
     const state = readPersistedDownloadWorkspace();
-    if (!state?.activeTaskId) {
+    if (!state) return null;
+    if (!state.documents.length && !state.activeTaskId) {
       clearPersistedDownloadWorkspace();
       return null;
     }
     downloadDocuments.value = state.documents;
-    downloadTargetDir.value = state.targetDir || '';
+    downloadTargetDir.value = state.activeTaskId ? (state.targetDir || '') : '';
     rebuildItems();
+    applyPersistedItems(state.items);
+    if (!state.activeTaskId) return null;
     startTaskProgress({
       taskId: state.activeTaskId,
       taskKind: 'download',
