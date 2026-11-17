@@ -1,4 +1,4 @@
-import { computed, ref, watch, type Ref } from 'vue';
+import { computed, ref, type Ref } from 'vue';
 import { open } from '@tauri-apps/plugin-dialog';
 import { Channel } from '@tauri-apps/api/core';
 import { createClientId } from './api';
@@ -15,7 +15,7 @@ import { t } from '../../i18n';
 
 type WorkspaceRequest = <T>(path: string, options?: RequestInit) => Promise<T>;
 
-const DOWNLOAD_DIR_STORAGE_KEY = 'picbed_download_target_dir';
+const LEGACY_DOWNLOAD_DIR_STORAGE_KEY = 'picbed_download_target_dir';
 
 type DownloadWorkspaceDeps = {
   request: WorkspaceRequest;
@@ -60,11 +60,11 @@ export function useWorkspaceDownload({
   const downloadDocuments = ref<DownloadDocument[]>([]);
   const downloadDragActive = ref(false);
   const downloadItems = ref<DownloadImageItem[]>([]);
-  const downloadTargetDir = ref(localStorage.getItem(DOWNLOAD_DIR_STORAGE_KEY) || '');
+  const downloadTargetDir = ref('');
   const downloadActive = ref(false);
   const downloadFilter = ref<DownloadImageFilter>('all');
 
-  watch(downloadTargetDir, value => localStorage.setItem(DOWNLOAD_DIR_STORAGE_KEY, value));
+  localStorage.removeItem(LEGACY_DOWNLOAD_DIR_STORAGE_KEY);
 
   const downloadTotalCount = computed(() => downloadItems.value.length);
   const downloadSuccessCount = computed(
