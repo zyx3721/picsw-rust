@@ -210,6 +210,56 @@ fn prepare_task_documents(app: &AppHandle, task_id: i64) -> TaskDocumentState {
     .unwrap_or(TaskDocumentState { completed: HashSet::new(), success: 0, partial: 0, failed: 0 })
 }
 
+fn document_name_key(name: &str) -> String {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        "untitled.md".to_string()
+    } else {
+        trimmed.to_lowercase()
+    }
+}
+
+/// 文档已完成并写入转换记录但状态未落库时，按记录补算终态
+fn finalize_documents_with_records(conn: &rusqlite::Connection, task_id: i64, now: &str) -> rusqlite::Result<()> {
+    let documents: Vec<(i64, String, i64)> = {
+        let mut stmt = conn.prepare(
+            "SELECT id, filename, total_images FROM conversion_task_documents WHERE task_id = ?1 AND status IN ('queued', 'running', 'interrupted')",
+        )?;
+        let rows = stmt.query_map([task_id], |row| {
+            Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, i64>(2)?))
+        })?;
+        let items = rows.filter_map(|row| row.ok()).collect();
+        items
+    };
+    for (document_id, filename, total_images) in documents {
+        let key = document_name_key(&filename);
+        let record = conn
+            .query_row(
+                "SELECT id, status, error_message FROM conversion_records WHERE task_id = ?1 AND lower(trim(original_filename)) = ?2 AND status IN ('success', 'partial', 'failed') ORDER BY id DESC LIMIT 1",
+                rusqlite::params![task_id, key],
+                |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+            )
+            .ok();
+        let Some((record_id, status, error_message)) = record else { continue };
+        let processed = if status == "success" {
+            total_images
+        } else {
+            conn.query_row(
+                "SELECT COUNT(*) FROM conversion_record_details WHERE record_id = ?1 AND status IN ('success', 'skipped')",
+                [record_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or(0)
+            .min(total_images)
+        };
+        conn.execute(
+            "UPDATE conversion_task_documents SET status = ?2, processed_images = ?3, error = ?4, updated_at = ?5 WHERE id = ?1",
+            rusqlite::params![document_id, status, processed, error_message, now],
+        )?;
+    }
+    Ok(())
+}
+
 /// 把中断任务恢复为排队状态，仅重试未完成文档
 pub fn prepare_task_resume(conn: &rusqlite::Connection, task_id: i64) -> rusqlite::Result<()> {
     let now = now_string();
@@ -269,6 +319,7 @@ pub fn prepare_task_resume(conn: &rusqlite::Connection, task_id: i64) -> rusqlit
             )?;
         }
     } else {
+        finalize_documents_with_records(conn, task_id, &now)?;
         conn.execute(
             "UPDATE conversion_task_documents SET status = 'queued', processed_images = 0, error = '', updated_at = ?2 WHERE task_id = ?1 AND status IN ('queued', 'running', 'interrupted')",
             rusqlite::params![task_id, now],
@@ -335,6 +386,12 @@ pub fn task_status(conn: &rusqlite::Connection, task_id: i64) -> Option<String> 
 
 fn mark_task_cancelled(conn: &rusqlite::Connection, task_id: i64) -> rusqlite::Result<()> {
     let now = now_string();
+    let task_type = conn
+        .query_row("SELECT task_type FROM conversion_tasks WHERE id = ?1", [task_id], |row| row.get::<_, String>(0))
+        .unwrap_or_default();
+    if task_type != "download" {
+        finalize_documents_with_records(conn, task_id, &now)?;
+    }
     conn.execute(
         "UPDATE conversion_task_documents SET status = 'cancelled', error = '', updated_at = ?2 WHERE task_id = ?1 AND status IN ('queued', 'running', 'interrupted')",
         rusqlite::params![task_id, now],
@@ -1034,6 +1091,8 @@ mod tests {
             CREATE TABLE conversion_task_documents (
                 id INTEGER PRIMARY KEY,
                 task_id INTEGER NOT NULL,
+                filename TEXT NOT NULL DEFAULT '',
+                total_images INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
                 processed_images INTEGER NOT NULL DEFAULT 0,
                 error TEXT NOT NULL,
@@ -1046,6 +1105,18 @@ mod tests {
                 status TEXT NOT NULL,
                 error TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL
+            );
+            CREATE TABLE conversion_records (
+                id INTEGER PRIMARY KEY,
+                task_id INTEGER,
+                original_filename TEXT NOT NULL,
+                status TEXT NOT NULL,
+                error_message TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE conversion_record_details (
+                id INTEGER PRIMARY KEY,
+                record_id INTEGER NOT NULL,
+                status TEXT NOT NULL
             );",
         )
         .unwrap();
@@ -1280,5 +1351,98 @@ mod tests {
         assert_eq!(rows[3], (2, "success".to_string()));
         assert_eq!(rows[4], (2, "pending".to_string()));
         assert_eq!(rows[5], (2, "pending".to_string()));
+    }
+
+    #[test]
+    fn convert_resume_finalizes_documents_with_records() {
+        let conn = test_connection();
+        insert_task(&conn, 1, "interrupted", 2, 0, 0);
+        conn.execute(
+            "INSERT INTO conversion_task_documents (id, task_id, filename, total_images, status, processed_images, error, updated_at) VALUES (1, 1, 'a.md', 5, 'running', 0, '', 'start')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO conversion_task_documents (id, task_id, filename, total_images, status, processed_images, error, updated_at) VALUES (2, 1, 'b.md', 3, 'queued', 0, '', 'start')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO conversion_records (id, task_id, original_filename, status, error_message) VALUES (10, 1, 'A.md', 'partial', '2 张图片处理失败')",
+            [],
+        )
+        .unwrap();
+        for status in ["success", "success", "skipped", "failed", "failed"] {
+            conn.execute("INSERT INTO conversion_record_details (record_id, status) VALUES (10, ?1)", [status])
+                .unwrap();
+        }
+
+        prepare_task_resume(&conn, 1).unwrap();
+
+        let documents: Vec<(i64, String, i64)> = conn
+            .prepare("SELECT id, status, processed_images FROM conversion_task_documents ORDER BY id")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .filter_map(|row| row.ok())
+            .collect();
+        assert_eq!(documents[0], (1, "partial".to_string(), 3));
+        assert_eq!(documents[1], (2, "queued".to_string(), 0));
+
+        let (status, success, partial, failed): (String, i64, i64, i64) = conn
+            .query_row(
+                "SELECT status, success, partial, failed FROM conversion_tasks WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "queued");
+        assert_eq!(success, 0);
+        assert_eq!(partial, 1);
+        assert_eq!(failed, 0);
+    }
+
+    #[test]
+    fn convert_cancel_keeps_documents_with_records() {
+        let conn = test_connection();
+        insert_task(&conn, 1, "queued", 2, 0, 0);
+        conn.execute(
+            "INSERT INTO conversion_task_documents (id, task_id, filename, total_images, status, processed_images, error, updated_at) VALUES (1, 1, 'a.md', 2, 'running', 0, '', 'start')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO conversion_task_documents (id, task_id, filename, total_images, status, processed_images, error, updated_at) VALUES (2, 1, 'b.md', 1, 'running', 0, '', 'start')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO conversion_records (id, task_id, original_filename, status, error_message) VALUES (20, 1, 'a.md', 'success', '')",
+            [],
+        )
+        .unwrap();
+
+        mark_task_cancelled(&conn, 1).unwrap();
+
+        let documents: Vec<(i64, String, i64)> = conn
+            .prepare("SELECT id, status, processed_images FROM conversion_task_documents ORDER BY id")
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .filter_map(|row| row.ok())
+            .collect();
+        assert_eq!(documents[0], (1, "success".to_string(), 2));
+        assert_eq!(documents[1], (2, "cancelled".to_string(), 0));
+
+        let (status, success, failed): (String, i64, i64) = conn
+            .query_row(
+                "SELECT status, success, failed FROM conversion_tasks WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(status, "cancelled");
+        assert_eq!(success, 1);
+        assert_eq!(failed, 0);
     }
 }
