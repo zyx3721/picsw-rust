@@ -1990,6 +1990,43 @@ svg {
   border-radius: 8px;
   background: #f8fafc;
 }
+.doc-issue-list {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid #ffd0cc;
+  border-radius: 8px;
+  background: var(--danger-soft);
+}
+.doc-issue-title {
+  margin: 0;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 800;
+}
+.doc-issue-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 8px;
+  font-size: 11.5px;
+}
+.doc-issue-url,
+.doc-issue-error {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doc-issue-url {
+  color: var(--muted);
+}
+.doc-issue-error {
+  color: var(--danger);
+}
+.doc-issue-more {
+  color: var(--danger);
+  font-size: 11px;
+}
 .diff-row {
   display: grid;
   grid-template-columns: 52px minmax(0, 1fr);
@@ -2019,6 +2056,9 @@ svg {
 }
 .batch-row[data-status='success']::before {
   background: var(--success);
+}
+.batch-row[data-status='partial']::before {
+  background: var(--warning);
 }
 .batch-row[data-status='failed']::before {
   background: var(--danger);
@@ -2656,9 +2696,17 @@ th {
   background: var(--success-soft);
   color: var(--success);
 }
-.status.failed {
+.status.partial {
   background: var(--warning-soft);
   color: var(--warning);
+}
+.status.failed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.status.skipped {
+  background: var(--primary-soft);
+  color: var(--primary-strong);
 }
 .empty {
   min-height: 88px;
@@ -2959,6 +3007,13 @@ th {
 .task-progress-doc[data-status='success'] .task-progress-doc-meter span {
   background: var(--success);
 }
+.task-progress-doc[data-status='partial'] .task-progress-doc-status {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.task-progress-doc[data-status='partial'] .task-progress-doc-meter span {
+  background: var(--warning);
+}
 .task-progress-doc[data-status='failed'] .task-progress-doc-status {
   background: var(--danger-soft);
   color: var(--danger);
@@ -2979,12 +3034,6 @@ th {
 }
 .task-progress-doc[data-status='cancelled'] .task-progress-doc-meter span {
   background: var(--border-strong);
-}
-.task-progress-doc-error {
-  margin: 0;
-  color: var(--danger);
-  font-size: 11.5px;
-  overflow-wrap: anywhere;
 }
 .task-progress-warning {
   margin: 0;
@@ -3459,6 +3508,9 @@ html.dark .config-row {
 }
 html.dark .preview-diff {
   background: var(--surface-muted);
+}
+html.dark .doc-issue-list {
+  border-color: rgba(248, 113, 113, 0.35);
 }
 html.dark table {
   background: var(--surface);

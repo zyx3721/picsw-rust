@@ -3,6 +3,7 @@ import { ChevronDown, Download, FileSearch, ImagePlus, Trash2, UploadCloud, Wand
 import { computed, ref } from 'vue';
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import type { ConversionRecordDetail, LocalDocument } from '../../composables/workspace/types';
 import { t } from '../../i18n';
 import { localizeError } from '../../i18n/errorText';
 
@@ -66,6 +67,10 @@ function confirmClear() {
   else if (clearTarget.value === 'documents') clearLocalDocuments();
   clearTarget.value = null;
 }
+
+function failedDetails(item: LocalDocument): ConversionRecordDetail[] {
+  return (item.details || []).filter(detail => detail.status === 'failed');
+}
 </script>
 
 <template>
@@ -123,6 +128,16 @@ function confirmClear() {
           ><button class="danger icon-only" type="button" @click="removeLocalDocument(item.id)">
             <Trash2 :size="17" />
           </button>
+        </div>
+        <div v-if="failedDetails(item).length" class="doc-issue-list">
+          <p class="doc-issue-title">{{ t('convert.issueFailed') }} · {{ failedDetails(item).length }}</p>
+          <div v-for="detail in failedDetails(item).slice(0, 4)" :key="detail.id" class="doc-issue-row">
+            <span class="doc-issue-url" :title="detail.original_url">{{ detail.original_url }}</span>
+            <AppTooltip v-if="detail.error" :label="localizeError(detail.error)" wrap>
+              <span class="doc-issue-error">{{ localizeError(detail.error) }}</span>
+            </AppTooltip>
+          </div>
+          <small v-if="failedDetails(item).length > 4" class="doc-issue-more">{{ t('convert.issueMore', { count: failedDetails(item).length - 4 }) }}</small>
         </div>
       </div>
       <p v-if="localDocuments.length === 0" class="empty">{{ t('local.docEmpty') }}</p>

@@ -3,6 +3,7 @@ import { ChevronDown, Download, Eye, FileSearch, Plus, Trash2, UploadCloud, Wand
 import { ref } from 'vue';
 import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
+import type { BatchFile, ConversionRecordDetail } from '../../composables/workspace/types';
 import { t } from '../../i18n';
 import { localizeError } from '../../i18n/errorText';
 
@@ -35,6 +36,10 @@ const {
 } = useWorkspaceContext();
 
 const clearConfirmOpen = ref(false);
+
+function failedDetails(file: BatchFile): ConversionRecordDetail[] {
+  return (file.details || []).filter(detail => detail.status === 'failed');
+}
 
 /// 确认后清空队列并关闭弹窗
 function confirmClearQueue() {
@@ -115,6 +120,16 @@ function confirmClearQueue() {
           ><button class="danger icon-only" type="button" @click="removeBatchFile(file.id)">
             <Trash2 :size="17" />
           </button>
+        </div>
+        <div v-if="failedDetails(file).length" class="doc-issue-list">
+          <p class="doc-issue-title">{{ t('convert.issueFailed') }} · {{ failedDetails(file).length }}</p>
+          <div v-for="detail in failedDetails(file).slice(0, 4)" :key="detail.id" class="doc-issue-row">
+            <span class="doc-issue-url" :title="detail.original_url">{{ detail.original_url }}</span>
+            <AppTooltip v-if="detail.error" :label="localizeError(detail.error)" wrap>
+              <span class="doc-issue-error">{{ localizeError(detail.error) }}</span>
+            </AppTooltip>
+          </div>
+          <small v-if="failedDetails(file).length > 4" class="doc-issue-more">{{ t('convert.issueMore', { count: failedDetails(file).length - 4 }) }}</small>
         </div>
         <div v-if="file.previewOpen" class="preview-diff">
           <div v-for="row in changedLines(file)" :key="row.line" class="diff-row">

@@ -4,7 +4,6 @@ import { computed } from 'vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import type { TaskDocumentProgress } from '../../composables/workspace/types';
 import { t } from '../../i18n';
-import { localizeError } from '../../i18n/errorText';
 
 const { taskProgress, closeTaskProgress, resumeTaskProgress, cancelTaskProgress } = useWorkspaceContext();
 
@@ -110,9 +109,6 @@ function documentCountLabel(document: TaskDocumentProgress) {
             <div class="task-progress-doc-meter" aria-hidden="true">
               <span :style="{ width: documentPercent(document) + '%' }"></span>
             </div>
-            <p v-if="document.status === 'failed' && document.error" class="task-progress-doc-error">
-              {{ localizeError(document.error) }}
-            </p>
           </div>
         </div>
       </div>

@@ -166,38 +166,26 @@ fn urlencoding_decode(value: &str) -> Result<String, ()> {
     Ok(percent_encoding::percent_decode_str(value).decode_utf8_lossy().to_string())
 }
 
-pub fn replace_image_urls<F>(content: &str, mut replace: F) -> Result<(String, usize), String>
+/// 替换图片地址；返回 None 的图片保留原地址并继续处理，避免单张失败中断整篇文档
+pub fn replace_image_urls<F>(content: &str, mut replace: F) -> (String, usize)
 where
-    F: FnMut(&str) -> Result<String, String>,
+    F: FnMut(&str) -> Option<String>,
 {
     let changed = RefCell::new(0usize);
-    let error: RefCell<Option<String>> = RefCell::new(None);
     let result = IMAGE_PATTERN.replace_all(content, |caps: &Captures| {
         let raw = caps.get(0).map(|m| m.as_str()).unwrap_or("").to_string();
-        if error.borrow().is_some() {
-            return raw;
-        }
         let Some(current_url) = capture_url(caps) else {
             return raw;
         };
         match replace(&current_url) {
-            Err(err) => {
-                *error.borrow_mut() = Some(err);
-                raw
-            }
-            Ok(new_url) => {
-                if new_url.trim().is_empty() || new_url == current_url {
-                    return raw;
-                }
+            Some(new_url) if !new_url.trim().is_empty() && new_url != current_url => {
                 *changed.borrow_mut() += 1;
                 raw.replacen(&current_url, &new_url, 1)
             }
+            _ => raw,
         }
     });
-    if let Some(err) = error.into_inner() {
-        return Err(err);
-    }
-    Ok((result.into_owned(), changed.into_inner()))
+    (result.into_owned(), changed.into_inner())
 }
 
 fn capture_url(caps: &Captures) -> Option<String> {
@@ -214,4 +202,24 @@ fn capture_url(caps: &Captures) -> Option<String> {
 
 pub fn sanitize_safe_filename(value: &str) -> String {
     SAFE_FILENAME_CHARS.replace_all(value, "-").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::replace_image_urls;
+
+    #[test]
+    fn keeps_unreplaced_images_and_continues() {
+        let content = "![a](https://a.com/1.png)\n![b](https://a.com/2.png)";
+        let (output, changed) = replace_image_urls(content, |url| {
+            if url.ends_with("1.png") {
+                Some("https://b.com/1.png".to_string())
+            } else {
+                None
+            }
+        });
+        assert_eq!(changed, 1);
+        assert!(output.contains("https://b.com/1.png"));
+        assert!(output.contains("https://a.com/2.png"));
+    }
 }

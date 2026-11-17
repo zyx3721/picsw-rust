@@ -141,9 +141,9 @@ fn summarize_source_pic_beds(images: &[MarkdownImage]) -> String {
 }
 
 enum PendingImage {
-    Keep(String),
+    Keep,
     Use { url: String },
-    Failed { message: String },
+    Failed,
 }
 
 pub async fn convert_one(
@@ -184,74 +184,56 @@ pub async fn convert_one(
     let source_picbed = summarize_source_pic_beds(&images);
 
     let unique_urls = collect_unique_urls(&images);
+    let total_images = unique_urls.len();
     let mut resolved: HashMap<String, PendingImage> = HashMap::new();
+    let mut details: Vec<ConversionRecordDetail> = Vec::new();
+    let mut failed_images = 0usize;
     for image_url in unique_urls {
         if state.is_task_cancelled(task_id) {
             return Err(TASK_CANCELLED.to_string());
         }
         if !is_http_image_url(&image_url) {
-            resolved.insert(image_url.clone(), PendingImage::Keep(image_url));
-            advance_document_progress(state, document_id);
+            let message = "本地路径无法通过批量转换上传".to_string();
+            resolved.insert(image_url.clone(), PendingImage::Keep);
+            failed_images += 1;
+            details.push(failed_detail(&image_url, &message));
             continue;
         }
         match upload_cached(upload_cache, target.id, &image_url, &target.picbed_type, &target_config).await {
             Ok(url) => {
-                resolved.insert(image_url.clone(), PendingImage::Use { url });
+                resolved.insert(image_url.clone(), PendingImage::Use { url: url.clone() });
+                details.push(success_detail(&image_url, &url));
                 advance_document_progress(state, document_id);
             }
             Err(err) => {
-                resolved.insert(image_url.clone(), PendingImage::Failed { message: err });
-                advance_document_progress(state, document_id);
-                break;
+                resolved.insert(image_url.clone(), PendingImage::Failed);
+                failed_images += 1;
+                details.push(failed_detail(&image_url, &err));
             }
         }
     }
 
-    let mut details: Vec<ConversionRecordDetail> = Vec::new();
-    let mut skipped_unsupported = 0usize;
     let filename = document_filename(&req.filename);
-    let (output, changed) = match replace_image_urls(&req.content, |current_url| match resolved.get(current_url) {
-        Some(PendingImage::Keep(original)) => {
-            skipped_unsupported += 1;
-            details.push(ConversionRecordDetail {
-                id: 0,
-                record_id: 0,
-                original_url: current_url.to_string(),
-                target_url: String::new(),
-                status: "failed".to_string(),
-                error: Some("本地路径无法通过批量转换上传".to_string()),
-                created_at: String::new(),
-            });
-            Ok(original.clone())
-        }
-        Some(PendingImage::Use { url }) => {
-            details.push(success_detail(current_url, url));
-            Ok(url.clone())
-        }
-        Some(PendingImage::Failed { message }) => Err(message.clone()),
-        None => Err(format!("下载图片 {} 失败：处理中断", current_url)),
-    }) {
-        Ok(result) => result,
-        Err(err) => {
-            write_failed_record(state, &filename, &source_picbed, &target.picbed_type, &err, task_id);
-            return Err(err);
-        }
-    };
+    let (output, changed) = replace_image_urls(&req.content, |current_url| match resolved.get(current_url) {
+        Some(PendingImage::Use { url }) => Some(url.clone()),
+        _ => None,
+    });
 
-    let mut status = "success";
-    let mut message = String::new();
-    if skipped_unsupported > 0 {
-        message = format!("存在 {} 个图片无法转换", skipped_unsupported);
-    }
-    if changed == 0 {
-        status = "failed";
-        if message.is_empty() {
-            message = "没有图片地址被转换".to_string();
-        }
-    }
     if state.is_task_cancelled(task_id) {
         return Err(TASK_CANCELLED.to_string());
     }
+    let status = if failed_images == 0 {
+        "success"
+    } else if failed_images >= total_images {
+        "failed"
+    } else {
+        "partial"
+    };
+    let message = if failed_images > 0 {
+        format!("{} 张图片处理失败", failed_images)
+    } else {
+        String::new()
+    };
     let record_value = {
         let conn = lock_db(state);
         let record = insert_record(
@@ -277,6 +259,8 @@ pub async fn convert_one(
         "filename": filename,
         "content": output,
         "changed": changed,
+        "failed": failed_images,
+        "skipped": 0,
         "status": status,
         "record": record_value,
     }))
@@ -320,13 +304,16 @@ pub async fn convert_local_one(
     }
 
     let unique_urls = collect_unique_urls(&images);
+    let total_images = unique_urls.len();
     let mut resolved: HashMap<String, PendingImage> = HashMap::new();
+    let mut details: Vec<ConversionRecordDetail> = Vec::new();
+    let mut failed_images = 0usize;
     for image_url in unique_urls {
         if state.is_task_cancelled(task_id) {
             return Err(TASK_CANCELLED.to_string());
         }
         if is_http_image_url(&image_url) {
-            resolved.insert(image_url.clone(), PendingImage::Keep(image_url));
+            resolved.insert(image_url.clone(), PendingImage::Keep);
             advance_document_progress(state, document_id);
             continue;
         }
@@ -336,25 +323,28 @@ pub async fn convert_local_one(
             .or_else(|| mapping_by_normalized.get(&normalize_local_image_source(&image_url)).cloned());
         let Some(file_key) = file_key else {
             let message = format!("本地图片 {} 未匹配到上传文件", image_url);
-            resolved.insert(image_url.clone(), PendingImage::Failed { message });
-            advance_document_progress(state, document_id);
-            break;
+            resolved.insert(image_url.clone(), PendingImage::Failed);
+            failed_images += 1;
+            details.push(failed_detail(&image_url, &message));
+            continue;
         };
         let cached = upload_cache
             .lock()
             .ok()
             .and_then(|cache| cache.get(&file_key).cloned());
         if let Some(cached) = cached {
-            resolved.insert(image_url.clone(), PendingImage::Use { url: cached });
+            resolved.insert(image_url.clone(), PendingImage::Use { url: cached.clone() });
+            details.push(success_detail(&image_url, &cached));
             advance_document_progress(state, document_id);
             continue;
         }
         let image_file = match (load_image)(&file_key) {
             Ok(file) => file,
             Err(err) => {
-                resolved.insert(image_url.clone(), PendingImage::Failed { message: err });
-                advance_document_progress(state, document_id);
-                break;
+                resolved.insert(image_url.clone(), PendingImage::Failed);
+                failed_images += 1;
+                details.push(failed_detail(&image_url, &err));
+                continue;
             }
         };
         match uploader::upload(&target.picbed_type, target_config, &mut image_file.clone()).await {
@@ -362,45 +352,40 @@ pub async fn convert_local_one(
                 if let Ok(mut cache) = upload_cache.lock() {
                     cache.insert(file_key.clone(), result.url.clone());
                 }
-                resolved.insert(image_url.clone(), PendingImage::Use { url: result.url });
+                resolved.insert(image_url.clone(), PendingImage::Use { url: result.url.clone() });
+                details.push(success_detail(&image_url, &result.url));
                 advance_document_progress(state, document_id);
             }
             Err(err) => {
                 let message = format!("上传图片 {} 失败：{}", image_url, err);
-                resolved.insert(image_url.clone(), PendingImage::Failed { message });
-                advance_document_progress(state, document_id);
-                break;
+                resolved.insert(image_url.clone(), PendingImage::Failed);
+                failed_images += 1;
+                details.push(failed_detail(&image_url, &message));
             }
         }
     }
 
-    let mut details: Vec<ConversionRecordDetail> = Vec::new();
     let filename = document_filename(&document.filename);
-    let (output, changed) = match replace_image_urls(&document.content, |current_url| match resolved.get(current_url) {
-        Some(PendingImage::Keep(original)) => Ok(original.clone()),
-        Some(PendingImage::Use { url }) => {
-            details.push(success_detail(current_url, url));
-            Ok(url.clone())
-        }
-        Some(PendingImage::Failed { message }) => Err(message.clone()),
-        None => Err(format!("本地图片 {} 未匹配到上传文件", current_url)),
-    }) {
-        Ok(result) => result,
-        Err(err) => {
-            write_failed_record(state, &filename, "local", &target.picbed_type, &err, task_id);
-            return Err(err);
-        }
-    };
+    let (output, changed) = replace_image_urls(&document.content, |current_url| match resolved.get(current_url) {
+        Some(PendingImage::Use { url }) => Some(url.clone()),
+        _ => None,
+    });
 
-    let mut status = "success";
-    let mut message = String::new();
-    if changed == 0 {
-        status = "failed";
-        message = "没有本地图片地址被转换".to_string();
-    }
     if state.is_task_cancelled(task_id) {
         return Err(TASK_CANCELLED.to_string());
     }
+    let status = if failed_images == 0 {
+        "success"
+    } else if failed_images >= total_images {
+        "failed"
+    } else {
+        "partial"
+    };
+    let message = if failed_images > 0 {
+        format!("{} 张图片处理失败", failed_images)
+    } else {
+        String::new()
+    };
     let record_value = {
         let conn = lock_db(state);
         let record = insert_record(
@@ -426,6 +411,8 @@ pub async fn convert_local_one(
         "filename": filename,
         "content": output,
         "changed": changed,
+        "failed": failed_images,
+        "skipped": 0,
         "status": status,
         "record": record_value,
     }))
@@ -482,6 +469,18 @@ fn success_detail(original_url: &str, target_url: &str) -> ConversionRecordDetai
         target_url: target_url.to_string(),
         status: "success".to_string(),
         error: None,
+        created_at: String::new(),
+    }
+}
+
+fn failed_detail(original_url: &str, error: &str) -> ConversionRecordDetail {
+    ConversionRecordDetail {
+        id: 0,
+        record_id: 0,
+        original_url: original_url.to_string(),
+        target_url: String::new(),
+        status: "failed".to_string(),
+        error: Some(error.to_string()),
         created_at: String::new(),
     }
 }

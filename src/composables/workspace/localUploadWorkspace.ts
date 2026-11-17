@@ -303,12 +303,14 @@ export function useWorkspaceLocalUpload({
         document.convertedContent = '';
         document.changed = 0;
         document.error = t('msg.local.noResult');
+        document.details = [];
         continue;
       }
-      document.status = record.status === 'success' ? 'success' : 'failed';
+      document.status = record.status === 'success' ? 'success' : record.status === 'partial' ? 'partial' : 'failed';
       document.convertedContent = record.converted_content || '';
       document.changed = record.image_count || 0;
       document.error = record.error_message || '';
+      document.details = record.details || [];
     }
   }
   async function pollLocalUploadTask(taskId: number, initialDelay = 600) {
@@ -354,8 +356,12 @@ export function useWorkspaceLocalUpload({
             message,
             detail: t('msg.local.taskDoneHint'),
           });
-          if (finalStatus === 'success') showMessage(t('msg.local.batchDone', { count: localConvertedCount.value }));
-          else showError(message);
+          if (finalStatus === 'success') {
+            if (data.task.partial > 0) showMessage(t('msg.local.batchDonePartial', { success: localConvertedCount.value, partial: data.task.partial }));
+            else showMessage(t('msg.local.batchDone', { count: localConvertedCount.value }));
+          } else {
+            showError(message);
+          }
         }
         await loadRecords();
         return;

@@ -98,7 +98,7 @@ export function useWorkspaceConvert({
   );
 
   function statusLabel(status: BatchFile['status']) {
-    return { ready: t('msg.convert.statusReady'), analyzed: t('msg.convert.statusAnalyzed'), success: t('msg.convert.statusConverted'), failed: t('msg.statusFailed') }[status];
+    return { ready: t('msg.convert.statusReady'), analyzed: t('msg.convert.statusAnalyzed'), success: t('msg.convert.statusConverted'), partial: t('msg.convert.statusPartial'), failed: t('msg.statusFailed') }[status];
   }
   function targetConfigLabel(config?: PicbedConfig) {
     return config ? `${config.config_name} · ${typeLabel(config.picbed_type)}` : t('common.pleaseSelect');
@@ -184,12 +184,14 @@ export function useWorkspaceConvert({
         file.convertedContent = '';
         file.changed = 0;
         file.error = t('msg.convert.noResult');
+        file.details = [];
         continue;
       }
-      file.status = record.status === 'success' ? 'success' : 'failed';
+      file.status = record.status === 'success' ? 'success' : record.status === 'partial' ? 'partial' : 'failed';
       file.convertedContent = record.converted_content || '';
       file.changed = record.image_count || 0;
       file.error = record.error_message || '';
+      file.details = record.details || [];
     }
   }
   async function addMarkdownFiles(fileList: FileList | File[]) {
@@ -355,8 +357,12 @@ export function useWorkspaceConvert({
             message,
             detail: t('msg.convert.taskDoneHint'),
           });
-          if (finalStatus === 'success') showMessage(t('msg.convert.batchDone', { count: convertedCount.value }));
-          else showError(message);
+          if (finalStatus === 'success') {
+            if (data.task.partial > 0) showMessage(t('msg.convert.batchDonePartial', { success: convertedCount.value, partial: data.task.partial }));
+            else showMessage(t('msg.convert.batchDone', { count: convertedCount.value }));
+          } else {
+            showError(message);
+          }
         }
         await loadRecords();
         return;

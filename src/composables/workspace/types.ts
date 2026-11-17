@@ -51,8 +51,9 @@ export type BatchFile = {
   images: MarkdownImage[];
   convertedContent: string;
   changed: number;
-  status: 'ready' | 'analyzed' | 'success' | 'failed';
+  status: 'ready' | 'analyzed' | 'success' | 'partial' | 'failed';
   error: string;
+  details?: ConversionRecordDetail[];
   previewOpen?: boolean;
 };
 
@@ -81,6 +82,7 @@ export type LocalDocument = {
   changed: number;
   status: 'ready' | 'analyzed' | 'success' | 'partial' | 'failed';
   error: string;
+  details?: ConversionRecordDetail[];
 };
 
 export type LocalImageFile = {

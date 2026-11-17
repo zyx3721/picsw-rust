@@ -25,6 +25,13 @@ const selectedRecordCount = computed(() => selectedRecordIds.value.length);
 const sourceOptions = computed(() => Array.from(new Set(records.value.map(record => record.source_picbed))));
 const targetOptions = computed(() => Array.from(new Set(records.value.map(record => record.target_picbed))));
 
+function recordStatusLabel(status: string) {
+  if (status === 'success') return t('records.statusSuccess');
+  if (status === 'partial') return t('records.statusPartial');
+  if (status === 'skipped') return t('records.statusSkipped');
+  return t('records.statusFailed');
+}
+
 /// 时间范围过滤的起止毫秒边界；自定义范围含起止当日全天
 function rangeBounds(range: string): [number | null, number | null] {
   if (range === 'today') {
@@ -50,8 +57,7 @@ const filteredRecords = computed(() => {
   return records.value.filter(record => {
     if (source && record.source_picbed !== source) return false;
     if (target && record.target_picbed !== target) return false;
-    if (status === 'success' && record.status !== 'success') return false;
-    if (status === 'failed' && record.status === 'success') return false;
+    if (status && record.status !== status) return false;
     const createdAt = new Date(record.created_at).getTime();
     if (rangeStart !== null && createdAt < rangeStart) return false;
     if (rangeEnd !== null && createdAt > rangeEnd) return false;
@@ -60,7 +66,7 @@ const filteredRecords = computed(() => {
       record.original_filename,
       typeLabel(record.source_picbed),
       typeLabel(record.target_picbed),
-      record.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed'),
+      recordStatusLabel(record.status),
       record.status,
       String(record.image_count),
       formatDateTime(record.created_at),
@@ -77,11 +83,7 @@ const allRecordsSelected = computed(
 );
 
 const statusFilterLabel = computed(() =>
-  statusFilter.value === 'success'
-    ? t('records.statusSuccess')
-    : statusFilter.value === 'failed'
-      ? t('records.statusFailed')
-      : t('records.allStatus')
+  statusFilter.value ? recordStatusLabel(statusFilter.value) : t('records.allStatus')
 );
 const sourceFilterLabel = computed(() => (sourceFilter.value ? typeLabel(sourceFilter.value) : t('records.allSources')));
 const targetFilterLabel = computed(() => (targetFilter.value ? typeLabel(targetFilter.value) : t('records.allTargets')));
@@ -295,6 +297,7 @@ function hideUrlTooltip() {
         </button>
         <div v-if="openFilterDropdown === 'status'" class="select-menu">
           <button class="select-option" :class="{ selected: statusFilter === 'success' }" type="button" @click="statusFilter = 'success'; closeFilterDropdowns()">{{ t('records.statusSuccess') }}</button>
+          <button class="select-option" :class="{ selected: statusFilter === 'partial' }" type="button" @click="statusFilter = 'partial'; closeFilterDropdowns()">{{ t('records.statusPartial') }}</button>
           <button class="select-option" :class="{ selected: statusFilter === 'failed' }" type="button" @click="statusFilter = 'failed'; closeFilterDropdowns()">{{ t('records.statusFailed') }}</button>
         </div>
       </div>
@@ -423,9 +426,7 @@ function hideUrlTooltip() {
           <td>{{ typeLabel(record.source_picbed) }}</td>
           <td>{{ typeLabel(record.target_picbed) }}</td>
           <td>
-            <span :class="['status', record.status]">{{
-              record.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed')
-            }}</span>
+            <span :class="['status', record.status]">{{ recordStatusLabel(record.status) }}</span>
           </td>
           <td>{{ record.image_count }}</td>
           <td>{{ formatDateTime(record.created_at) }}</td>
@@ -461,7 +462,7 @@ function hideUrlTooltip() {
       </div>
       <div class="record-stat">
         <span>{{ t('records.colStatus') }}</span>
-        <strong><span :class="['status', recordDetail.status]">{{ recordDetail.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed') }}</span></strong>
+        <strong><span :class="['status', recordDetail.status]">{{ recordStatusLabel(recordDetail.status) }}</span></strong>
       </div>
       <div class="record-stat">
         <span>{{ t('records.colImages') }}</span>
@@ -525,7 +526,7 @@ function hideUrlTooltip() {
                 </a>
                 <span v-else>-</span>
               </td>
-              <td><span :class="['status', detail.status]">{{ detail.status === 'success' ? t('records.statusSuccess') : t('records.statusFailed') }}</span></td>
+              <td><span :class="['status', detail.status]">{{ recordStatusLabel(detail.status) }}</span></td>
             </tr>
           </tbody>
         </table>
