@@ -5,6 +5,7 @@ mod secret_store;
 mod engine;
 mod markdown;
 mod models;
+mod picbed_match;
 mod task_queue;
 mod types_def;
 mod uploader;

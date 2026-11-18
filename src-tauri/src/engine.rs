@@ -182,13 +182,6 @@ pub async fn convert_one(
         return Err(err);
     }
     let source_picbed = summarize_source_pic_beds(&images);
-    let mut picbed_by_url: HashMap<String, String> = HashMap::new();
-    for image in &images {
-        picbed_by_url
-            .entry(image.url.trim().to_string())
-            .or_insert_with(|| image.picbed.clone());
-    }
-
     let unique_urls = collect_unique_urls(&images);
     let total_images = unique_urls.len();
     let mut resolved: HashMap<String, PendingImage> = HashMap::new();
@@ -199,20 +192,29 @@ pub async fn convert_one(
         if state.is_task_cancelled(task_id) {
             return Err(TASK_CANCELLED.to_string());
         }
-        let image_picbed = picbed_by_url.get(&image_url).map(|value| value.as_str()).unwrap_or("");
-        if is_same_picbed(image_picbed, &target.picbed_type) {
-            resolved.insert(image_url.clone(), PendingImage::Keep);
-            skipped_images += 1;
-            details.push(skipped_detail(&image_url));
-            advance_document_progress(state, document_id);
-            continue;
-        }
         if !is_http_image_url(&image_url) {
             let message = "本地路径无法通过批量转换上传".to_string();
             resolved.insert(image_url.clone(), PendingImage::Keep);
             failed_images += 1;
             details.push(failed_detail(&image_url, &message));
             continue;
+        }
+        if crate::picbed_match::is_owned_by_target(&image_url, &target.picbed_type, &target_config) {
+            match uploader::check_image_available(&image_url).await {
+                Ok(()) => {
+                    resolved.insert(image_url.clone(), PendingImage::Keep);
+                    skipped_images += 1;
+                    details.push(skipped_detail(&image_url));
+                    advance_document_progress(state, document_id);
+                    continue;
+                }
+                Err(err) => {
+                    resolved.insert(image_url.clone(), PendingImage::Failed);
+                    failed_images += 1;
+                    details.push(failed_detail(&image_url, &err));
+                    continue;
+                }
+            }
         }
         match upload_cached(upload_cache, target.id, &image_url, &target.picbed_type, &target_config).await {
             Ok(url) => {
@@ -528,10 +530,6 @@ fn skipped_detail(original_url: &str) -> ConversionRecordDetail {
     }
 }
 
-fn is_same_picbed(image_picbed: &str, target_picbed: &str) -> bool {
-    !image_picbed.is_empty() && image_picbed != "other" && image_picbed == target_picbed
-}
-
 fn content_cache_key(data: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
@@ -683,16 +681,7 @@ pub fn load_record_details(conn: &rusqlite::Connection, record_id: i64) -> Vec<C
 
 #[cfg(test)]
 mod tests {
-    use super::{content_cache_key, is_same_picbed};
-
-    #[test]
-    fn skips_only_known_same_host() {
-        assert!(is_same_picbed("github", "github"));
-        assert!(is_same_picbed("gitee", "gitee"));
-        assert!(!is_same_picbed("gitee", "github"));
-        assert!(!is_same_picbed("other", "other"));
-        assert!(!is_same_picbed("", "github"));
-    }
+    use super::content_cache_key;
 
     #[test]
     fn content_cache_key_depends_on_bytes() {

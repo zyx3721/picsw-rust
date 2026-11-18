@@ -58,15 +58,7 @@ pub fn http_client() -> &'static reqwest::Client {
 }
 
 pub async fn download_image(raw_url: &str) -> Result<ImageFile, String> {
-    let trimmed = raw_url.trim();
-    let parsed = url::Url::parse(trimmed).map_err(|_| "图片地址不正确".to_string())?;
-    if parsed.host_str().unwrap_or("").is_empty() {
-        return Err("图片地址不正确".to_string());
-    }
-    let scheme = parsed.scheme();
-    if scheme != "http" && scheme != "https" {
-        return Err("图片地址仅支持 HTTP 或 HTTPS".to_string());
-    }
+    let parsed = parse_http_url(raw_url)?;
 
     let resp = http_client()
         .get(parsed.clone())
@@ -104,6 +96,72 @@ pub async fn download_image(raw_url: &str) -> Result<ImageFile, String> {
 
     let filename = build_filename(&parsed, &content_type, &data);
     Ok(ImageFile { filename, content_type, data })
+}
+
+fn parse_http_url(raw_url: &str) -> Result<url::Url, String> {
+    let parsed = url::Url::parse(raw_url.trim()).map_err(|_| "图片地址不正确".to_string())?;
+    if parsed.host_str().unwrap_or("").is_empty() {
+        return Err("图片地址不正确".to_string());
+    }
+    let scheme = parsed.scheme();
+    if scheme != "http" && scheme != "https" {
+        return Err("图片地址仅支持 HTTP 或 HTTPS".to_string());
+    }
+    Ok(parsed)
+}
+
+/// 检查远程图片地址是否可访问且不是明显的错误页面
+pub async fn check_image_available(raw_url: &str) -> Result<(), String> {
+    let parsed = parse_http_url(raw_url)?;
+    if let Ok(response) = http_client()
+        .head(parsed.clone())
+        .header(reqwest::header::ACCEPT, "image/*,*/*;q=0.8")
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+    {
+        let status = response.status().as_u16();
+        if status == 404 || status == 410 {
+            return Err(format!("图片地址不存在（HTTP {}）", status));
+        }
+        if (200..300).contains(&status) {
+            return classify_probe_response(status, &response_content_type(&response));
+        }
+    }
+    let response = http_client()
+        .get(parsed)
+        .header(reqwest::header::ACCEPT, "image/*,*/*;q=0.8")
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|err| format!("检查图片地址失败：{}", err))?;
+    classify_probe_response(response.status().as_u16(), &response_content_type(&response))
+}
+
+fn response_content_type(response: &reqwest::Response) -> String {
+    response
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or("")
+        .split(';')
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_ascii_lowercase()
+}
+
+fn classify_probe_response(status: u16, content_type: &str) -> Result<(), String> {
+    if status == 404 || status == 410 {
+        return Err(format!("图片地址不存在（HTTP {}）", status));
+    }
+    if !(200..300).contains(&status) {
+        return Err(format!("图片地址无法访问（HTTP {}）", status));
+    }
+    if content_type.is_empty() || content_type.starts_with("image/") || content_type.ends_with("/octet-stream") {
+        return Ok(());
+    }
+    Err("该地址不是有效图片".to_string())
 }
 
 async fn read_limited_body(resp: reqwest::Response) -> Result<Vec<u8>, String> {
@@ -455,7 +513,7 @@ pub fn encode_base64(data: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::TEST_IMAGE;
+    use super::{classify_probe_response, parse_http_url, TEST_IMAGE};
 
     #[test]
     fn test_image_meets_common_minimum_size() {
@@ -463,5 +521,40 @@ mod tests {
         let width = u32::from_be_bytes(TEST_IMAGE[16..20].try_into().unwrap());
         let height = u32::from_be_bytes(TEST_IMAGE[20..24].try_into().unwrap());
         assert_eq!((width, height), (1920, 1200));
+    }
+
+    #[test]
+    fn classifies_probe_responses() {
+        assert!(classify_probe_response(200, "image/png").is_ok());
+        assert!(classify_probe_response(206, "image/webp").is_ok());
+        assert!(classify_probe_response(200, "application/octet-stream").is_ok());
+        assert!(classify_probe_response(200, "").is_ok());
+        assert_eq!(
+            classify_probe_response(404, "").unwrap_err(),
+            "图片地址不存在（HTTP 404）"
+        );
+        assert_eq!(
+            classify_probe_response(410, "text/html").unwrap_err(),
+            "图片地址不存在（HTTP 410）"
+        );
+        assert_eq!(
+            classify_probe_response(500, "text/html").unwrap_err(),
+            "图片地址无法访问（HTTP 500）"
+        );
+        assert_eq!(
+            classify_probe_response(200, "text/html").unwrap_err(),
+            "该地址不是有效图片"
+        );
+        assert_eq!(
+            classify_probe_response(200, "application/json").unwrap_err(),
+            "该地址不是有效图片"
+        );
+    }
+
+    #[test]
+    fn rejects_non_http_url() {
+        assert!(parse_http_url("not-a-url").is_err());
+        assert!(parse_http_url("ftp://example.com/a.png").is_err());
+        assert!(parse_http_url("https://example.com/a.png").is_ok());
     }
 }
