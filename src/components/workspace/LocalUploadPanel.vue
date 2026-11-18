@@ -5,7 +5,7 @@ import AppTooltip from '../AppTooltip.vue';
 import { useWorkspaceContext } from '../../composables/useWorkspaceContext';
 import type { ConversionRecordDetail, LocalDocument, ScannedLocalImage } from '../../composables/workspace/types';
 import { t } from '../../i18n';
-import { localizeError } from '../../i18n/errorText';
+import { localizeError, localizeImageError } from '../../i18n/errorText';
 
 const {
   loading,
@@ -182,8 +182,8 @@ function confirmScan() {
             <AppTooltip class="doc-issue-url" :label="detail.original_url" wrap>
               <span>{{ detail.original_url }}</span>
             </AppTooltip>
-            <AppTooltip v-if="detail.error" :label="localizeError(detail.error)" wrap>
-              <span class="doc-issue-error">{{ localizeError(detail.error) }}</span>
+            <AppTooltip v-if="detail.error" :label="localizeImageError(detail.error)" wrap>
+              <span class="doc-issue-error">{{ localizeImageError(detail.error) }}</span>
             </AppTooltip>
           </div>
           <small v-if="failedDetails(item).length > 4" class="doc-issue-more">{{ t('convert.issueMore', { count: failedDetails(item).length - 4 }) }}</small>

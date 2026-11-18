@@ -351,3 +351,12 @@ export function localizeBackendText(message: string): string {
   if (!message || getLocale() !== 'en') return message;
   return applyRules(message);
 }
+
+function compactImageError(message: string): string {
+  return message.replace(/^(?:下载|上传)图片 .+? 失败：/, '');
+}
+
+/// 去掉旧记录中重复的图片地址前缀并翻译错误
+export function localizeImageError(message: string): string {
+  return localizeError(compactImageError(message));
+}

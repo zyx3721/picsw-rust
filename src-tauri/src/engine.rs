@@ -390,10 +390,9 @@ pub async fn convert_local_one(
                 advance_document_progress(state, document_id);
             }
             Err(err) => {
-                let message = format!("上传图片 {} 失败：{}", image_url, err);
                 resolved.insert(image_url.clone(), PendingImage::Failed);
                 failed_images += 1;
-                details.push(failed_detail(&image_url, &message));
+                details.push(failed_detail(&image_url, &err));
             }
         }
     }
@@ -467,13 +466,10 @@ async fn download_and_upload(
     picbed_type: &str,
     cfg: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<String, String> {
-    let image = uploader::download_image(image_url)
-        .await
-        .map_err(|err| format!("下载图片 {} 失败：{}", image_url, err))?;
+    let image = uploader::download_image(image_url).await?;
     uploader::upload(picbed_type, cfg, &mut image.clone())
         .await
         .map(|result| result.url)
-        .map_err(|err| format!("上传图片 {} 失败：{}", image_url, err))
 }
 
 async fn upload_cached(
