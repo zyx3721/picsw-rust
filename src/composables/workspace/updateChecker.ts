@@ -6,7 +6,7 @@ import { t } from '../../i18n';
 
 const RELEASE_PAGE_URL = 'https://github.com/zyx3721/picsw-rust/releases/latest';
 const RELEASE_DOWNLOAD_BASE = 'https://github.com/zyx3721/picsw-rust/releases/download';
-const AUTO_CHECK_DELAY_MS = 8000;
+const AUTO_CHECK_DELAY_MS = 3000;
 const UP_TO_DATE_RESET_MS = 5000;
 const AUTO_CHECK_STORAGE_KEY = 'picbed_update_auto_check';
 const LAST_CHECK_STORAGE_KEY = 'picbed_update_last_check_at';

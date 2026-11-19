@@ -1168,11 +1168,22 @@ svg {
   background: var(--danger-soft);
   color: var(--danger);
 }
-.sync-token-banner {
+.corner-notices {
   position: fixed;
   right: 20px;
   bottom: 20px;
   z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  pointer-events: none;
+}
+.corner-notices > * {
+  pointer-events: auto;
+}
+.sync-token-banner,
+.update-banner {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1190,18 +1201,27 @@ svg {
   cursor: pointer;
   transition: background 0.15s ease;
 }
-.sync-token-banner:hover {
+.sync-token-banner:hover,
+.update-banner:hover {
   background: var(--surface-muted);
 }
-.sync-token-banner svg {
+.sync-token-banner svg,
+.update-banner svg {
   flex-shrink: 0;
+}
+.sync-token-banner svg {
   color: var(--danger);
 }
-.sync-token-banner span {
+.update-banner svg {
+  color: var(--success);
+}
+.sync-token-banner span,
+.update-banner span {
   min-width: 0;
   flex: 1;
 }
-.sync-token-banner em {
+.sync-token-banner em,
+.update-banner em {
   flex-shrink: 0;
   color: var(--primary-strong);
   font-style: normal;

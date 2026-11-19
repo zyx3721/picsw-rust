@@ -269,6 +269,8 @@ export const en: Record<keyof typeof zh, string> = {
   'about.lastCheckSuffix': 'Last check: {when}; ',
   'about.progress': '{percent}% ({done} / {total})',
   'about.downloaded': 'Downloaded {size}',
+  'update.availableHint': 'New version v{version} found; open About to update',
+  'update.viewUpdate': 'Update',
   'about.closeBehaviorTitle': 'When Closing Window',
   'about.closeBehaviorDesc': 'Ask on close; minimize to tray keeps conversions running — restore or quit from the tray',
   'about.closeAsk': 'Ask every time',

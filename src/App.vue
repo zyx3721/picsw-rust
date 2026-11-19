@@ -18,6 +18,7 @@ import ConfigsPanel from './components/workspace/ConfigsPanel.vue';
 import RecordsPanel from './components/workspace/RecordsPanel.vue';
 import CloudSyncPanel from './components/workspace/CloudSyncPanel.vue';
 import SyncTokenBanner from './components/workspace/SyncTokenBanner.vue';
+import UpdateBanner from './components/workspace/UpdateBanner.vue';
 import AboutPanel from './components/workspace/AboutPanel.vue';
 import WorkspaceHeader from './components/workspace/WorkspaceHeader.vue';
 import WorkspaceTabs from './components/workspace/WorkspaceTabs.vue';
@@ -347,7 +348,10 @@ analyzeBatch, convertBatch, analyzeLocalBatch, uploadLocalBatch, closeGithubProx
       <RecordsPanel v-if="activeTab === 'records'" />
       <CloudSyncPanel v-if="activeTab === 'cloudSync'" />
       <AboutPanel v-if="activeTab === 'about'" />
-      <SyncTokenBanner />
+      <div class="corner-notices">
+        <UpdateBanner />
+        <SyncTokenBanner />
+      </div>
     </section>
     <GithubProxyDialog />
     <TaskProgressDialog />

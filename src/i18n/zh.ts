@@ -267,6 +267,8 @@ export const zh = {
   'about.lastCheckSuffix': '上次检查：{when}；',
   'about.progress': '{percent}%（{done} / {total}）',
   'about.downloaded': '已下载 {size}',
+  'update.availableHint': '检测到新版本 v{version}，前往关于页更新',
+  'update.viewUpdate': '去更新',
   'about.closeBehaviorTitle': '关闭窗口时',
   'about.closeBehaviorDesc': '每次询问为首次关闭时弹窗；最小化后应用在后台运行，转换任务不受影响，可从系统托盘恢复窗口或退出',
   'about.closeAsk': '每次询问',
